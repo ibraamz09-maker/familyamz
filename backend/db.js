@@ -65,9 +65,15 @@ async function init() {
       category TEXT NOT NULL,
       description TEXT DEFAULT '',
       member_id INTEGER,
+      expense_id INTEGER,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  // Migration: ajouter expense_id si la colonne n'existe pas encore
+  try {
+    await db.execute('ALTER TABLE receipts ADD COLUMN expense_id INTEGER');
+  } catch (e) { /* colonne déjà existante */ }
 
   const res = await db.execute('SELECT id FROM admins WHERE username = ?', ['admin']);
   if (res.rows.length === 0) {
