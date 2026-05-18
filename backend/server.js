@@ -1,0 +1,32 @@
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+const { init } = require('./db');
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+app.use(cors());
+app.use(express.json());
+
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/admin', require('./routes/admin'));
+app.use('/api/members', require('./routes/members'));
+app.use('/api/calendar', require('./routes/calendar'));
+app.use('/api/tasks', require('./routes/tasks'));
+app.use('/api/expenses', require('./routes/expenses'));
+
+const frontendDist = path.join(__dirname, '../frontend/dist');
+app.use(express.static(frontendDist));
+app.get('*', (req, res) => {
+  res.sendFile(path.join(frontendDist, 'index.html'));
+});
+
+init().then(() => {
+  app.listen(PORT, () => {
+    console.log(`FamilyAmz backend sur http://localhost:${PORT}`);
+  });
+}).catch(err => {
+  console.error('Erreur initialisation base de données:', err);
+  process.exit(1);
+});
