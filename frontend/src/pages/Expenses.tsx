@@ -1,16 +1,47 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { api } from '../api';
-import { Expense, Member, EXPENSE_CATEGORIES, CATEGORY_COLORS, MONTHS_FR } from '../types';
+import { Expense, Receipt, Member, EXPENSE_CATEGORIES, CATEGORY_COLORS, MONTHS_FR } from '../types';
 import Modal from '../components/Modal';
 
 function fmt(n: number) { return n.toFixed(2).replace('.', ',') + ' €'; }
 
+function compressImage(file: File): Promise<{ data: string; mimetype: string; filename: string }> {
+  return new Promise((resolve) => {
+    if (!file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const b64 = (reader.result as string).split(',')[1];
+        resolve({ data: b64, mimetype: file.type, filename: file.name });
+      };
+      reader.readAsDataURL(file);
+      return;
+    }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX = 1200;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+      resolve({ data: dataUrl.split(',')[1], mimetype: 'image/jpeg', filename: file.name.replace(/\.[^.]+$/, '.jpg') });
+    };
+    img.src = url;
+  });
+}
+
 export default function Expenses() {
   const today = new Date();
-  const [view, setView] = useState<'monthly' | 'annual'>('monthly');
+  const [view, setView] = useState<'monthly' | 'annual' | 'tickets'>('monthly');
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -26,13 +57,28 @@ export default function Expenses() {
   });
   const [loading, setLoading] = useState(false);
 
+  // Tickets state
+  const [receipts, setReceipts] = useState<Receipt[]>([]);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [receiptForm, setReceiptForm] = useState({
+    filename: '', mimetype: '', data: '',
+    amount: '', date: today.toISOString().slice(0, 10),
+    category: EXPENSE_CATEGORIES[0], description: '', member_id: '',
+  });
+
   const fetchData = useCallback(async () => {
     const [exps, mbrs] = await Promise.all([
-      view === 'monthly' ? api.getExpenses(year, month + 1) : api.getExpenses(year),
+      view === 'monthly' ? api.getExpenses(year, month + 1) : view === 'annual' ? api.getExpenses(year) : api.getExpenses(year),
       api.getMembers(),
     ]);
     setExpenses(exps as Expense[]);
     setMembers(mbrs as Member[]);
+    if (view === 'tickets') {
+      const recs = await api.getReceipts(year, month + 1);
+      setReceipts(recs as Receipt[]);
+    }
   }, [view, year, month]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -109,26 +155,20 @@ export default function Expenses() {
   return (
     <div>
       <div className="view-toggle">
-        <button className={`view-tab ${view === 'monthly' ? 'active' : ''}`} onClick={() => setView('monthly')}>
-          Mensuel
-        </button>
-        <button className={`view-tab ${view === 'annual' ? 'active' : ''}`} onClick={() => setView('annual')}>
-          Annuel
-        </button>
+        <button className={`view-tab ${view === 'monthly' ? 'active' : ''}`} onClick={() => setView('monthly')}>Mensuel</button>
+        <button className={`view-tab ${view === 'annual' ? 'active' : ''}`} onClick={() => setView('annual')}>Annuel</button>
+        <button className={`view-tab ${view === 'tickets' ? 'active' : ''}`} onClick={() => setView('tickets')}>🧾 Tickets</button>
       </div>
 
       {/* Navigation */}
-      {view === 'monthly' ? (
+      {view === 'monthly' && (
         <div className="month-nav">
-          <button className="nav-btn" onClick={() => {
-            if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1);
-          }}>‹</button>
+          <button className="nav-btn" onClick={() => { if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1); }}>‹</button>
           <span>{MONTHS_FR[month]} {year}</span>
-          <button className="nav-btn" onClick={() => {
-            if (month === 11) { setMonth(0); setYear(y => y + 1); } else setMonth(m => m + 1);
-          }}>›</button>
+          <button className="nav-btn" onClick={() => { if (month === 11) { setMonth(0); setYear(y => y + 1); } else setMonth(m => m + 1); }}>›</button>
         </div>
-      ) : (
+      )}
+      {view === 'annual' && (
         <div className="month-nav">
           <button className="nav-btn" onClick={() => setYear(y => y - 1)}>‹</button>
           <span>{year}</span>
@@ -137,13 +177,15 @@ export default function Expenses() {
       )}
 
       {/* Total */}
-      <div className="total-card">
-        <div>
-          <div className="total-label">{view === 'monthly' ? `Total ${MONTHS_FR[month]}` : `Total ${year}`}</div>
-          <div className="total-amount">{fmt(total)}</div>
+      {view !== 'tickets' && (
+        <div className="total-card">
+          <div>
+            <div className="total-label">{view === 'monthly' ? `Total ${MONTHS_FR[month]}` : `Total ${year}`}</div>
+            <div className="total-amount">{fmt(total)}</div>
+          </div>
+          <span style={{ fontSize: 32 }}>💶</span>
         </div>
-        <span style={{ fontSize: 32 }}>💶</span>
-      </div>
+      )}
 
       {view === 'monthly' ? (
         <>
@@ -187,7 +229,7 @@ export default function Expenses() {
             ))
           )}
         </>
-      ) : (
+      ) : view === 'annual' ? (
         <>
           <div className="chart-container">
             <ResponsiveContainer width="100%" height={220}>
@@ -228,11 +270,103 @@ export default function Expenses() {
             );
           })}
         </>
+      ) : null}
+
+      {view === 'tickets' && (
+        <>
+          <div className="month-nav">
+            <button className="nav-btn" onClick={() => { if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1); }}>‹</button>
+            <span>{MONTHS_FR[month]} {year}</span>
+            <button className="nav-btn" onClick={() => { if (month === 11) { setMonth(0); setYear(y => y + 1); } else setMonth(m => m + 1); }}>›</button>
+          </div>
+          {receipts.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-icon">🧾</div>
+              <p>Aucun ticket ce mois-ci</p>
+            </div>
+          ) : (
+            receipts.map(r => (
+              <div key={r.id} className="receipt-item">
+                <div className="receipt-thumb">{r.mimetype.startsWith('image/') ? '🖼️' : '📄'}</div>
+                <div className="receipt-info">
+                  <div className="receipt-name">{r.description || r.filename}</div>
+                  <div className="receipt-meta">{r.date} · {r.category}{r.amount != null ? ` · ${fmt(r.amount)}` : ''}</div>
+                </div>
+                <div className="receipt-actions">
+                  <button className="btn-icon" onClick={() => { const a = document.createElement('a'); a.href = api.getReceiptFileUrl(r.id); a.download = r.filename; a.click(); }}>⬇️</button>
+                  <button className="btn-icon" onClick={async () => { await api.deleteReceipt(r.id); const recs = await api.getReceipts(year, month + 1); setReceipts(recs as Receipt[]); }}>🗑️</button>
+                </div>
+              </div>
+            ))
+          )}
+        </>
       )}
 
       <div style={{ height: 24 }} />
 
-      <button className="fab" onClick={openAdd} title="Ajouter une dépense">+</button>
+      <button className="fab" onClick={view === 'tickets' ? () => setShowReceiptModal(true) : openAdd} title={view === 'tickets' ? 'Ajouter un ticket' : 'Ajouter une dépense'}>+</button>
+
+      {showReceiptModal && (
+        <Modal title="Ajouter un ticket" onClose={() => setShowReceiptModal(false)}>
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            if (!receiptForm.data) return;
+            setLoading(true);
+            try {
+              await api.createReceipt({
+                filename: receiptForm.filename, mimetype: receiptForm.mimetype, data: receiptForm.data,
+                amount: receiptForm.amount ? parseFloat(receiptForm.amount.replace(',', '.')) : null,
+                date: receiptForm.date, category: receiptForm.category,
+                description: receiptForm.description,
+                member_id: receiptForm.member_id ? Number(receiptForm.member_id) : null,
+              });
+              setShowReceiptModal(false);
+              const recs = await api.getReceipts(year, month + 1);
+              setReceipts(recs as Receipt[]);
+            } finally { setLoading(false); }
+          }}>
+            <label className="form-label">Fichier (photo, screenshot, PDF)</label>
+            <div className="upload-zone" onClick={() => fileRef.current?.click()}>
+              {receiptPreview ? (
+                <img src={receiptPreview} alt="aperçu" style={{ maxWidth: '100%', maxHeight: 160, borderRadius: 8 }} />
+              ) : receiptForm.filename ? (
+                <div style={{ padding: 20 }}>📄 {receiptForm.filename}</div>
+              ) : (
+                <div style={{ padding: 28, color: 'var(--text-2)', textAlign: 'center' }}>
+                  <div style={{ fontSize: 32 }}>📎</div>
+                  <div style={{ marginTop: 8, fontSize: 14 }}>Appuie pour choisir un fichier</div>
+                </div>
+              )}
+            </div>
+            <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const compressed = await compressImage(file);
+              setReceiptForm(f => ({ ...f, ...compressed }));
+              if (compressed.mimetype.startsWith('image/')) setReceiptPreview(`data:${compressed.mimetype};base64,${compressed.data}`);
+              else setReceiptPreview(null);
+            }} />
+            <label className="form-label">Catégorie</label>
+            <select className="select" value={receiptForm.category} onChange={e => setReceiptForm(f => ({ ...f, category: e.target.value as import('../types').ExpenseCategory }))}>
+              {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <label className="form-label">Date</label>
+            <input className="input" type="date" value={receiptForm.date} onChange={e => setReceiptForm(f => ({ ...f, date: e.target.value }))} required />
+            <label className="form-label">Montant (€) — optionnel</label>
+            <input className="input" type="number" step="0.01" min="0" placeholder="0,00" value={receiptForm.amount} onChange={e => setReceiptForm(f => ({ ...f, amount: e.target.value }))} />
+            <label className="form-label">Description (optionnel)</label>
+            <input className="input" placeholder="ex: Facture EDF, Amazon..." value={receiptForm.description} onChange={e => setReceiptForm(f => ({ ...f, description: e.target.value }))} />
+            <label className="form-label">Membre concerné</label>
+            <select className="select" value={receiptForm.member_id} onChange={e => setReceiptForm(f => ({ ...f, member_id: e.target.value }))}>
+              <option value="">Toute la famille</option>
+              {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+            <button className="btn-primary" type="submit" disabled={loading || !receiptForm.data}>
+              {loading ? '...' : 'Ajouter'}
+            </button>
+          </form>
+        </Modal>
+      )}
 
       {showModal && (
         <Modal
