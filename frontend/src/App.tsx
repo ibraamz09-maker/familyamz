@@ -6,16 +6,18 @@ import Calendar from './pages/Calendar';
 import Tasks from './pages/Tasks';
 import Expenses from './pages/Expenses';
 import Members from './pages/Members';
+import Receipts from './pages/Receipts';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 
-type Tab = 'calendar' | 'tasks' | 'expenses' | 'members';
+type Tab = 'calendar' | 'tasks' | 'expenses' | 'members' | 'receipts';
 
 const TAB_TITLES: Record<Tab, string> = {
   calendar: 'Calendrier',
   tasks: 'Tâches',
   expenses: 'Dépenses',
   members: 'Membres',
+  receipts: 'Tickets',
 };
 
 export default function App() {
@@ -36,6 +38,7 @@ export default function App() {
         {activeTab === 'tasks' && <Tasks />}
         {activeTab === 'expenses' && <Expenses />}
         {activeTab === 'members' && <Members />}
+        {activeTab === 'receipts' && <Receipts />}
       </main>
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
     </div>

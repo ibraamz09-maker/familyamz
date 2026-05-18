@@ -1,4 +1,4 @@
-type Tab = 'calendar' | 'tasks' | 'expenses' | 'members';
+type Tab = 'calendar' | 'tasks' | 'expenses' | 'members' | 'receipts';
 
 interface Props {
   activeTab: Tab;
@@ -9,6 +9,7 @@ const tabs: { id: Tab; icon: string; label: string }[] = [
   { id: 'calendar', icon: '📅', label: 'Calendrier' },
   { id: 'tasks', icon: '✅', label: 'Tâches' },
   { id: 'expenses', icon: '💶', label: 'Dépenses' },
+  { id: 'receipts', icon: '🧾', label: 'Tickets' },
   { id: 'members', icon: '👥', label: 'Membres' },
 ];
 

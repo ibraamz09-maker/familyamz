@@ -62,6 +62,18 @@ export const CATEGORY_COLORS: Record<string, string> = {
   Autres: '#6B7280',
 };
 
+export interface Receipt {
+  id: number;
+  filename: string;
+  mimetype: string;
+  amount: number | null;
+  date: string;
+  category: string;
+  description: string;
+  member_id: number | null;
+  created_at: string;
+}
+
 export const PRESET_COLORS = [
   '#EF4444', '#F97316', '#EAB308', '#22C55E', '#06B6D4',
   '#3B82F6', '#8B5CF6', '#EC4899', '#14B8A6', '#F59E0B',

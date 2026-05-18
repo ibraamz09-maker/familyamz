@@ -65,4 +65,20 @@ export const api = {
   }) => req('POST', '/expenses', data),
   updateExpense: (id: number, data: unknown) => req('PUT', `/expenses/${id}`, data),
   deleteExpense: (id: number) => req('DELETE', `/expenses/${id}`),
+
+  getReceipts: (year?: number, month?: number, category?: string) => {
+    const p = new URLSearchParams();
+    if (year) p.set('year', String(year));
+    if (month) p.set('month', String(month));
+    if (category) p.set('category', category);
+    const q = p.toString() ? `?${p}` : '';
+    return req<unknown[]>('GET', `/receipts${q}`);
+  },
+  createReceipt: (data: {
+    filename: string; mimetype: string; data: string;
+    amount?: number | null; date: string; category: string;
+    description?: string; member_id?: number | null;
+  }) => req<{ id: number }>('POST', '/receipts', data),
+  deleteReceipt: (id: number) => req('DELETE', `/receipts/${id}`),
+  getReceiptFileUrl: (id: number) => `/api/receipts/${id}/file`,
 };

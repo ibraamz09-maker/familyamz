@@ -54,6 +54,19 @@ async function init() {
       description TEXT DEFAULT '',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE TABLE IF NOT EXISTS receipts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      family_id INTEGER NOT NULL,
+      filename TEXT NOT NULL,
+      mimetype TEXT NOT NULL,
+      data TEXT NOT NULL,
+      amount REAL,
+      date TEXT NOT NULL,
+      category TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      member_id INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   const res = await db.execute('SELECT id FROM admins WHERE username = ?', ['admin']);
