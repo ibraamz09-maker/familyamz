@@ -14,6 +14,7 @@ export default function MapPage() {
   const [statusType, setStatusType] = useState<'info' | 'error' | 'success'>('info');
   const [cityInput, setCityInput] = useState('');
   const [showCityInput, setShowCityInput] = useState(false);
+  const [autoUpdate, setAutoUpdate] = useState(false);
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
@@ -30,6 +31,25 @@ export default function MapPage() {
     const interval = setInterval(fetchMembers, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Mise à jour automatique de la position toutes les heures
+  useEffect(() => {
+    if (!autoUpdate || !currentMember) return;
+    const shareAuto = () => {
+      if (!navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          await api.updateLocation(currentMember.id, pos.coords.latitude, pos.coords.longitude).catch(() => {});
+          await fetchMembers();
+        },
+        () => {}, // échec silencieux
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      );
+    };
+    shareAuto(); // partage immédiat
+    const interval = setInterval(shareAuto, 60 * 60 * 1000); // toutes les heures
+    return () => clearInterval(interval);
+  }, [autoUpdate, currentMember]);
 
   /* Initialise la carte Leaflet une seule fois */
   useEffect(() => {
@@ -179,8 +199,8 @@ export default function MapPage() {
 
   return (
     <div>
-      {/* Bouton partager */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+      {/* Boutons */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <button className="btn-primary" onClick={shareLocation} disabled={sharing} style={{ flex: 1 }}>
           {sharing ? '📡 Localisation...' : '📍 Partager ma position'}
         </button>
@@ -188,6 +208,22 @@ export default function MapPage() {
           🔄
         </button>
       </div>
+      {currentMember && (
+        <button
+          onClick={() => setAutoUpdate(a => !a)}
+          style={{
+            width: '100%', padding: '11px 14px', borderRadius: 12,
+            border: `2px solid ${autoUpdate ? '#22C55E' : 'var(--border)'}`,
+            background: autoUpdate ? '#F0FDF4' : 'var(--surface)',
+            color: autoUpdate ? '#166534' : 'var(--text-2)',
+            fontSize: 14, fontWeight: 600, cursor: 'pointer',
+            marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          }}
+        >
+          <span>{autoUpdate ? '🟢' : '⚪'}</span>
+          {autoUpdate ? 'Mise à jour auto activée (toutes les heures)' : 'Activer la mise à jour auto'}
+        </button>
+      )}
 
       {/* Message statut */}
       {statusMsg && (
