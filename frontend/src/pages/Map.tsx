@@ -23,10 +23,10 @@ export default function MapPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const shareLocation = async () => {
+  const shareLocation = () => {
     if (!currentMember) {
       setStatusType('error');
-      setStatusMsg('⚠️ Connecte-toi en tant que membre (ex: Ibrahim) pour partager ta position');
+      setStatusMsg('⚠️ Connecte-toi en tant que membre pour partager ta position');
       return;
     }
     if (!navigator.geolocation) {
@@ -34,21 +34,23 @@ export default function MapPage() {
       setStatusMsg('❌ Ce navigateur ne supporte pas la géolocalisation');
       return;
     }
+
     setSharing(true);
     setStatusType('info');
     setStatusMsg('📡 Récupération de ta position...');
 
+    // Essai sans haute précision (plus compatible iOS Safari)
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
           await api.updateLocation(currentMember.id, pos.coords.latitude, pos.coords.longitude);
           setStatusType('success');
-          setStatusMsg('✅ Ta position a été partagée avec la famille !');
+          setStatusMsg('✅ Position partagée avec la famille !');
           await fetchMembers();
           setTimeout(() => setStatusMsg(''), 4000);
         } catch {
           setStatusType('error');
-          setStatusMsg('❌ Erreur lors du partage');
+          setStatusMsg('❌ Erreur réseau lors du partage');
         } finally {
           setSharing(false);
         }
@@ -57,29 +59,49 @@ export default function MapPage() {
         setSharing(false);
         setStatusType('error');
         if (err.code === 1) {
-          setStatusMsg('🔒 Géolocalisation refusée. Va dans les réglages de ton navigateur → autorise la localisation pour ce site.');
+          setStatusMsg('🔒 Accès refusé. Sur iPhone : Réglages → Confidentialité → Service de localisation → Safari Sites web → "Lors de l\'utilisation"');
         } else if (err.code === 2) {
-          setStatusMsg('❌ Position introuvable. Vérifie que le GPS est activé.');
+          setStatusMsg('❌ Position introuvable. Active le GPS et réessaie en extérieur.');
         } else {
-          setStatusMsg('❌ Délai dépassé. Réessaie en extérieur ou avec le WiFi.');
+          setStatusMsg('❌ Délai dépassé. Réessaie dans quelques secondes.');
         }
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      // Pas de enableHighAccuracy pour meilleure compatibilité iOS
+      { timeout: 20000, maximumAge: 60000 }
     );
   };
 
-  const openInMaps = (m: Member) => {
-    if (m.lat == null || m.lng == null) return;
-    window.open(`https://www.google.com/maps?q=${m.lat},${m.lng}`, '_blank');
+  const locatedMembers = members.filter(m => m.lat != null && m.lng != null);
+
+  // Carte statique OpenStreetMap avec tous les membres localisés
+  const getMapUrl = () => {
+    if (locatedMembers.length === 0) return null;
+
+    // Calculer le centre
+    const avgLat = locatedMembers.reduce((s, m) => s + m.lat!, 0) / locatedMembers.length;
+    const avgLng = locatedMembers.reduce((s, m) => s + m.lng!, 0) / locatedMembers.length;
+
+    // Marqueurs pour chaque membre
+    const markers = locatedMembers
+      .map(m => `${m.lat},${m.lng},red-pushpin`)
+      .join('|');
+
+    // Zoom adapté au nombre de membres
+    const zoom = locatedMembers.length === 1 ? 15 : 13;
+
+    return `https://staticmap.openstreetmap.de/staticmap.php?center=${avgLat},${avgLng}&zoom=${zoom}&size=400x300&markers=${markers}`;
   };
 
-  const locatedMembers = members.filter(m => m.lat != null && m.lng != null);
-  const mapSrc = locatedMembers.length > 0
-    ? `https://maps.google.com/maps?q=${locatedMembers[0].lat},${locatedMembers[0].lng}&z=14&output=embed`
-    : null;
+  const mapUrl = getMapUrl();
+
+  const openMemberInMaps = (m: Member) => {
+    if (m.lat == null || m.lng == null) return;
+    window.open(`https://maps.google.com/maps?q=${m.lat},${m.lng}`, '_blank');
+  };
 
   return (
     <div>
+      {/* Boutons */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
         <button
           className="btn-primary"
@@ -94,13 +116,15 @@ export default function MapPage() {
         </button>
       </div>
 
+      {/* Message statut */}
       {statusMsg && (
         <div style={{
           padding: '12px 14px',
           borderRadius: 10,
           marginBottom: 12,
-          fontSize: 14,
+          fontSize: 13,
           fontWeight: 500,
+          lineHeight: 1.5,
           background: statusType === 'success' ? '#DCFCE7' : statusType === 'error' ? '#FEE2E2' : 'var(--primary-light)',
           color: statusType === 'success' ? '#166534' : statusType === 'error' ? '#991B1B' : 'var(--primary-dark)',
         }}>
@@ -108,19 +132,42 @@ export default function MapPage() {
         </div>
       )}
 
+      {/* Avertissement si pas membre */}
       {!currentMember && (
         <div style={{ padding: '10px 14px', borderRadius: 10, marginBottom: 12, fontSize: 13, background: '#FEF3C7', color: '#92400E' }}>
-          💡 Connecte-toi avec ton compte membre (onglet "Membre" sur la page de connexion) pour partager ta position.
+          💡 Connecte-toi avec ton prénom (onglet "Membre") pour partager ta position.
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+      {/* Carte avec tous les membres */}
+      {mapUrl ? (
+        <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid var(--border)', marginBottom: 14, background: '#f0f0f0' }}>
+          <img
+            src={mapUrl}
+            alt="Carte famille"
+            style={{ width: '100%', display: 'block' }}
+            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
+          <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-2)', textAlign: 'center' }}>
+            © OpenStreetMap · {locatedMembers.length} membre{locatedMembers.length > 1 ? 's' : ''} localisé{locatedMembers.length > 1 ? 's' : ''}
+          </div>
+        </div>
+      ) : (
+        <div className="empty-state" style={{ marginBottom: 14 }}>
+          <div className="empty-state-icon">🗺️</div>
+          <p>Aucune position partagée</p>
+          <p style={{ fontSize: 13, color: 'var(--text-2)' }}>La carte apparaîtra ici dès qu'un membre partage sa position</p>
+        </div>
+      )}
+
+      {/* Liste des membres */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {members.map(m => (
           <div
             key={m.id}
             className="member-item"
             style={{ cursor: m.lat != null ? 'pointer' : 'default' }}
-            onClick={() => openInMaps(m)}
+            onClick={() => openMemberInMaps(m)}
           >
             <div className="member-color-badge" style={{ backgroundColor: m.color }}>
               {m.name.charAt(0).toUpperCase()}
@@ -129,33 +176,13 @@ export default function MapPage() {
               <div style={{ fontWeight: 700, fontSize: 15 }}>{m.name}</div>
               <div style={{ fontSize: 12, color: 'var(--text-2)' }}>
                 {m.lat != null
-                  ? `🟢 Localisé${m.location_at ? ' à ' + new Date(m.location_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''} · Ouvrir Maps →`
+                  ? `🟢 ${m.location_at ? new Date(m.location_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : 'localisé'} · Voir sur Google Maps →`
                   : '⚪ Position non partagée'}
               </div>
             </div>
           </div>
         ))}
       </div>
-
-      {mapSrc ? (
-        <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid var(--border)' }}>
-          <iframe
-            title="Carte famille"
-            src={mapSrc}
-            width="100%"
-            height="360"
-            style={{ border: 'none', display: 'block' }}
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-          />
-        </div>
-      ) : (
-        <div className="empty-state" style={{ marginTop: 8 }}>
-          <div className="empty-state-icon">🗺️</div>
-          <p>Aucune position partagée</p>
-          <p style={{ fontSize: 13, color: 'var(--text-2)' }}>Connecte-toi en tant que membre et appuie sur "Partager ma position"</p>
-        </div>
-      )}
     </div>
   );
 }
