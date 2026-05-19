@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
-import * as L from 'leaflet';
+import { useState, useEffect } from 'react';
 import { api } from '../api';
 import { Member } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,9 +8,6 @@ export default function MapPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [sharing, setSharing] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
-  const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<L.Map | null>(null);
-  const markersRef = useRef<L.Marker[]>([]);
 
   const fetchMembers = async () => {
     const data = await api.getMembers();
@@ -23,73 +19,6 @@ export default function MapPage() {
     const interval = setInterval(fetchMembers, 30000);
     return () => clearInterval(interval);
   }, []);
-
-  useEffect(() => {
-    if (!mapRef.current) return;
-
-    if (!mapInstanceRef.current) {
-      const map = L.map(mapRef.current, {
-        center: [48.8566, 2.3522],
-        zoom: 12,
-      });
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
-      }).addTo(map);
-      mapInstanceRef.current = map;
-    }
-
-    updateMarkers(members);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [members]);
-
-  function updateMarkers(memberList: Member[]) {
-    const map = mapInstanceRef.current;
-    if (!map) return;
-
-    markersRef.current.forEach(m => m.remove());
-    markersRef.current = [];
-
-    const located = memberList.filter(m => m.lat != null && m.lng != null);
-    if (located.length === 0) return;
-
-    const bounds: [number, number][] = [];
-
-    located.forEach(m => {
-      const lat = m.lat!;
-      const lng = m.lng!;
-      bounds.push([lat, lng]);
-
-      const icon = L.divIcon({
-        html: `<div style="
-          background:${m.color};
-          color:white;
-          width:36px;height:36px;
-          border-radius:50%;
-          display:flex;align-items:center;justify-content:center;
-          font-weight:700;font-size:15px;
-          border:3px solid white;
-          box-shadow:0 2px 8px rgba(0,0,0,0.3);
-        ">${m.name.charAt(0).toUpperCase()}</div>`,
-        className: '',
-        iconSize: [36, 36],
-        iconAnchor: [18, 18],
-      });
-
-      const timeStr = m.location_at
-        ? new Date(m.location_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-        : '';
-
-      const marker = L.marker([lat, lng], { icon })
-        .addTo(map)
-        .bindPopup(`<b>${m.name}</b>${timeStr ? `<br>🕐 ${timeStr}` : ''}`);
-
-      markersRef.current.push(marker);
-    });
-
-    if (bounds.length > 0) {
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
-    }
-  }
 
   const shareLocation = async () => {
     if (!currentMember) {
@@ -123,7 +52,17 @@ export default function MapPage() {
     );
   };
 
-  const locatedCount = members.filter(m => m.lat != null).length;
+  const openInMaps = (m: Member) => {
+    if (m.lat == null || m.lng == null) return;
+    window.open(`https://www.google.com/maps?q=${m.lat},${m.lng}`, '_blank');
+  };
+
+  const locatedMembers = members.filter(m => m.lat != null && m.lng != null);
+
+  // Build a Google Maps embed URL with all located members
+  const mapSrc = locatedMembers.length > 0
+    ? `https://maps.google.com/maps?q=${locatedMembers[0].lat},${locatedMembers[0].lng}&z=14&output=embed`
+    : null;
 
   return (
     <div>
@@ -151,17 +90,19 @@ export default function MapPage() {
         </div>
       )}
 
-      <div className="map-legend">
+      {/* Membres et leurs positions */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
         {members.map(m => (
-          <div key={m.id} className="map-legend-item">
-            <div className="map-legend-dot" style={{ backgroundColor: m.color }}>
+          <div key={m.id} className="member-item" style={{ cursor: m.lat != null ? 'pointer' : 'default' }}
+            onClick={() => openInMaps(m)}>
+            <div className="member-color-badge" style={{ backgroundColor: m.color }}>
               {m.name.charAt(0).toUpperCase()}
             </div>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 13 }}>{m.name}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-2)' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>{m.name}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-2)' }}>
                 {m.lat != null
-                  ? `🟢 ${m.location_at ? new Date(m.location_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : 'localisé'}`
+                  ? `🟢 Localisé${m.location_at ? ' à ' + new Date(m.location_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''} · Voir sur Maps →`
                   : '⚪ Position inconnue'}
               </div>
             </div>
@@ -169,17 +110,24 @@ export default function MapPage() {
         ))}
       </div>
 
-      <div
-        ref={mapRef}
-        className="map-container"
-        style={{ height: 400, borderRadius: 16, overflow: 'hidden', border: '1px solid var(--border)' }}
-      />
-
-      {locatedCount === 0 && (
+      {/* Carte Google Maps embed */}
+      {mapSrc ? (
+        <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid var(--border)', marginBottom: 8 }}>
+          <iframe
+            title="Carte famille"
+            src={mapSrc}
+            width="100%"
+            height="380"
+            style={{ border: 'none', display: 'block' }}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
+        </div>
+      ) : (
         <div className="empty-state" style={{ marginTop: 16 }}>
           <div className="empty-state-icon">🗺️</div>
           <p>Aucun membre n'a partagé sa position</p>
-          <p style={{ fontSize: 13, color: 'var(--text-2)' }}>Appuie sur "Partager ma position" pour apparaître sur la carte</p>
+          <p style={{ fontSize: 13, color: 'var(--text-2)' }}>Appuie sur "Partager ma position" pour apparaître</p>
         </div>
       )}
     </div>
