@@ -90,7 +90,9 @@ export default function Expenses() {
         const list = recs as Receipt[];
         if (list.length > 0) {
           setReceipts(list);
-          localStorage.setItem(RECEIPTS_CACHE_KEY, JSON.stringify(list));
+          // Stocker SANS le champ data (base64 image trop grande pour localStorage)
+          const toCache = list.map(r => ({ ...r, data: '' }));
+          try { localStorage.setItem(RECEIPTS_CACHE_KEY, JSON.stringify(toCache)); } catch { /* quota */ }
         } else {
           // Serveur vide mais cache présent → garder le cache affiché
           const cached = localStorage.getItem(RECEIPTS_CACHE_KEY);
@@ -345,7 +347,10 @@ export default function Expenses() {
               const recs = await api.getReceipts();
               const list = recs as Receipt[];
               setReceipts(list);
-              localStorage.setItem(RECEIPTS_CACHE_KEY, JSON.stringify(list));
+              try {
+                const toCache = list.map(r => ({ ...r, data: '' }));
+                localStorage.setItem(RECEIPTS_CACHE_KEY, JSON.stringify(toCache));
+              } catch { /* quota dépassé */ }
             } finally { setLoading(false); }
           }}>
             <label className="form-label">Fichier (photo, screenshot, PDF)</label>

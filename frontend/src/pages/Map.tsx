@@ -32,6 +32,27 @@ export default function MapPage() {
     return () => clearInterval(interval);
   }, []);
 
+  // Partage automatique à l'ouverture si la permission est déjà accordée
+  useEffect(() => {
+    if (!currentMember || !navigator.geolocation) return;
+    const tryAuto = () => {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          await api.updateLocation(currentMember.id, pos.coords.latitude, pos.coords.longitude).catch(() => {});
+          await fetchMembers();
+        },
+        () => {}, // silencieux si refusé
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+      );
+    };
+    // Vérifie si la permission est déjà accordée (sans pop-up)
+    if ('permissions' in navigator) {
+      navigator.permissions.query({ name: 'geolocation' as PermissionName }).then(result => {
+        if (result.state === 'granted') tryAuto();
+      }).catch(() => {});
+    }
+  }, [currentMember]);
+
   // Mise à jour automatique de la position toutes les heures
   useEffect(() => {
     if (!autoUpdate || !currentMember) return;
