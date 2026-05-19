@@ -81,4 +81,6 @@ export const api = {
   }) => req<{ id: number }>('POST', '/receipts', data),
   deleteReceipt: (id: number) => req('DELETE', `/receipts/${id}`),
   getReceiptFileUrl: (id: number) => `/api/receipts/${id}/file`,
+  analyzeReceipt: (data: string, mimetype: string) =>
+    req<{ amount: number | null; date: string; category: string; description: string }>('POST', '/receipts/analyze', { data, mimetype }),
 };

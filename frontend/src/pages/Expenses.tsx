@@ -61,6 +61,7 @@ export default function Expenses() {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [receiptForm, setReceiptForm] = useState({
     filename: '', mimetype: '', data: '',
@@ -326,8 +327,13 @@ export default function Expenses() {
             } finally { setLoading(false); }
           }}>
             <label className="form-label">Fichier (photo, screenshot, PDF)</label>
-            <div className="upload-zone" onClick={() => fileRef.current?.click()}>
-              {receiptPreview ? (
+            <div className="upload-zone" onClick={() => !analyzing && fileRef.current?.click()}>
+              {analyzing ? (
+                <div style={{ padding: 28, color: 'var(--primary)', textAlign: 'center' }}>
+                  <div style={{ fontSize: 28 }}>🔍</div>
+                  <div style={{ marginTop: 8, fontSize: 14, fontWeight: 600 }}>Analyse en cours...</div>
+                </div>
+              ) : receiptPreview ? (
                 <img src={receiptPreview} alt="aperçu" style={{ maxWidth: '100%', maxHeight: 160, borderRadius: 8 }} />
               ) : receiptForm.filename ? (
                 <div style={{ padding: 20 }}>📄 {receiptForm.filename}</div>
@@ -345,6 +351,19 @@ export default function Expenses() {
               setReceiptForm(f => ({ ...f, ...compressed }));
               if (compressed.mimetype.startsWith('image/')) setReceiptPreview(`data:${compressed.mimetype};base64,${compressed.data}`);
               else setReceiptPreview(null);
+              // Analyse automatique avec Gemini
+              setAnalyzing(true);
+              try {
+                const result = await api.analyzeReceipt(compressed.data, compressed.mimetype);
+                setReceiptForm(f => ({
+                  ...f,
+                  amount: result.amount != null ? String(result.amount) : f.amount,
+                  date: result.date || f.date,
+                  category: (result.category as import('../types').ExpenseCategory) || f.category,
+                  description: result.description || f.description,
+                }));
+              } catch (err) { /* ignore */ }
+              finally { setAnalyzing(false); }
             }} />
             <label className="form-label">Catégorie</label>
             <select className="select" value={receiptForm.category} onChange={e => setReceiptForm(f => ({ ...f, category: e.target.value as import('../types').ExpenseCategory }))}>
@@ -361,8 +380,8 @@ export default function Expenses() {
               <option value="">Toute la famille</option>
               {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
-            <button className="btn-primary" type="submit" disabled={loading || !receiptForm.data}>
-              {loading ? '...' : 'Ajouter'}
+            <button className="btn-primary" type="submit" disabled={loading || analyzing || !receiptForm.data}>
+              {analyzing ? '🔍 Analyse...' : loading ? '...' : 'Ajouter'}
             </button>
           </form>
         </Modal>

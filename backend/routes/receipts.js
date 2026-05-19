@@ -2,6 +2,45 @@ const express = require('express');
 const router = express.Router();
 const { db } = require('../db');
 const { authMiddleware } = require('../middleware/auth');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+const CATEGORIES = ['Loisirs', 'Vêtements', 'Abonnements', 'Électricité', 'Essence', 'Autres'];
+
+async function analyzeWithGemini(base64Data, mimetype) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const today = new Date().toISOString().slice(0, 10);
+    const prompt = `Analyse ce ticket de caisse ou cette facture et extrais les informations suivantes en JSON.
+Catégories disponibles: ${CATEGORIES.join(', ')}.
+Date du jour si non trouvée: ${today}.
+
+Réponds UNIQUEMENT avec ce JSON (sans markdown) :
+{"amount": <montant total en nombre décimal ou null>, "date": "<date au format YYYY-MM-DD ou ${today}>", "category": "<une des catégories>", "description": "<nom du magasin ou service>"}`;
+
+    const result = await model.generateContent([
+      { inlineData: { data: base64Data, mimeType: mimetype } },
+      prompt
+    ]);
+    const text = result.response.text().trim();
+    return JSON.parse(text);
+  } catch (e) {
+    console.error('Gemini error:', e.message);
+    return null;
+  }
+}
+
+router.post('/analyze', authMiddleware, async (req, res) => {
+  try {
+    const { data, mimetype } = req.body;
+    if (!data || !mimetype) return res.status(400).json({ error: 'Image manquante' });
+    const result = await analyzeWithGemini(data, mimetype);
+    if (!result) return res.json({ amount: null, date: new Date().toISOString().slice(0, 10), category: 'Autres', description: '' });
+    res.json(result);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 router.get('/', authMiddleware, async (req, res) => {
   try {
