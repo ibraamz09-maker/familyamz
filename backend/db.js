@@ -2,8 +2,16 @@ const { createClient } = require('@libsql/client');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 
+const dbUrl = process.env.TURSO_DATABASE_URL || `file:${path.join(__dirname, 'familyamz.db')}`;
+const hasToken = !!process.env.TURSO_AUTH_TOKEN;
+console.log(`[DB] URL: ${dbUrl.startsWith('libsql://') ? dbUrl : 'local SQLite'}`);
+console.log(`[DB] Auth token: ${hasToken ? 'OK' : 'MANQUANT — données non persistantes!'}`);
+if (dbUrl.startsWith('libsql://') && !hasToken) {
+  console.warn('[DB] ATTENTION: TURSO_DATABASE_URL défini mais TURSO_AUTH_TOKEN manquant!');
+}
+
 const db = createClient({
-  url: process.env.TURSO_DATABASE_URL || `file:${path.join(__dirname, 'familyamz.db')}`,
+  url: dbUrl,
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
