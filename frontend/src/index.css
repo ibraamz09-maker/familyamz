@@ -69,7 +69,7 @@ html, body {
   flex: 1;
   overflow-y: auto;
   padding: 16px;
-  padding-bottom: 88px;
+  padding-bottom: 110px;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -878,6 +878,41 @@ html, body {
   background: var(--surface);
   padding: 12px 0 4px;
   margin-top: 8px;
+}
+
+/* ==================== MEMBER CHIPS (calendar) ==================== */
+.member-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.member-chip {
+  padding: 7px 16px;
+  border-radius: 20px;
+  border: 2px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.member-chip.selected {
+  color: white;
+}
+
+/* ==================== EVENT DETAIL ==================== */
+.detail-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 15px;
+}
+.detail-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
 }
 
 /* ==================== MEMBER LOGIN ==================== */

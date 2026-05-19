@@ -60,24 +60,43 @@ export default function Members() {
 
   const initials = (name: string) => name.slice(0, 1).toUpperCase();
 
+  const formatLastSeen = (lastSeen?: string | null) => {
+    if (!lastSeen) return null;
+    const d = new Date(lastSeen);
+    const now = new Date();
+    const diffMin = Math.floor((now.getTime() - d.getTime()) / 60000);
+    if (diffMin < 2) return '🟢 En ligne';
+    if (diffMin < 60) return `⚪ Il y a ${diffMin} min`;
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24) return `⚪ Il y a ${diffH}h`;
+    const diffD = Math.floor(diffH / 24);
+    return `⚪ Il y a ${diffD} jour${diffD > 1 ? 's' : ''}`;
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <p className="section-title">{members.length} / 15 membre{members.length > 1 ? 's' : ''}</p>
       </div>
 
-      {members.map(m => (
-        <div key={m.id} className="member-item">
-          <div className="member-color-badge" style={{ backgroundColor: m.color }}>
-            {initials(m.name)}
+      {members.map(m => {
+        const lastSeenLabel = formatLastSeen((m as { last_seen?: string | null }).last_seen);
+        return (
+          <div key={m.id} className="member-item">
+            <div className="member-color-badge" style={{ backgroundColor: m.color }}>
+              {initials(m.name)}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700 }}>{m.name}</div>
+              {lastSeenLabel && <div style={{ fontSize: 12, color: 'var(--text-2)' }}>{lastSeenLabel}</div>}
+            </div>
+            <div className="member-actions">
+              <button className="btn-icon" onClick={() => openEdit(m)}>✏️</button>
+              <button className="btn-icon" onClick={() => handleDelete(m.id, m.name)}>🗑️</button>
+            </div>
           </div>
-          <span className="member-name">{m.name}</span>
-          <div className="member-actions">
-            <button className="btn-icon" onClick={() => openEdit(m)}>✏️</button>
-            <button className="btn-icon" onClick={() => handleDelete(m.id, m.name)}>🗑️</button>
-          </div>
-        </div>
-      ))}
+        );
+      })}
 
       {members.length < 15 && (
         <button className="add-btn" onClick={openAdd}>

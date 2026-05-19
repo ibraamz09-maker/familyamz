@@ -31,7 +31,8 @@ export default function Calendar() {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
-  const [form, setForm] = useState({ title: '', description: '', member_id: '', time: '' });
+  const [detailEvent, setDetailEvent] = useState<CalendarEvent | null>(null);
+  const [form, setForm] = useState({ title: '', description: '', member_ids: [] as number[], time: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [calView, setCalView] = useState<'day' | 'week'>('day');
@@ -40,13 +41,10 @@ export default function Calendar() {
 
   const fetchMonthData = useCallback(async () => {
     try {
-      const [evts, mbrs] = await Promise.all([
-        api.getEvents(year, month + 1),
-        api.getMembers(),
-      ]);
+      const [evts, mbrs] = await Promise.all([api.getEvents(year, month + 1), api.getMembers()]);
       setEvents(evts as CalendarEvent[]);
       setMembers(mbrs as Member[]);
-    } catch { /* silently fail */ }
+    } catch { /* ignore */ }
   }, [year, month]);
 
   useEffect(() => { fetchMonthData(); }, [fetchMonthData]);
@@ -57,7 +55,7 @@ export default function Calendar() {
       const sunday = addDays(monday, 6);
       const evts = await api.getEvents(undefined, undefined, dateToStr(monday), dateToStr(sunday));
       setWeekEvents(evts as CalendarEvent[]);
-    } catch { /* silently fail */ }
+    } catch { /* ignore */ }
   }, [viewDate]);
 
   useEffect(() => { fetchWeekData(); }, [fetchWeekData]);
@@ -73,22 +71,34 @@ export default function Calendar() {
     return d >= 1 && d <= daysInMonth ? d : null;
   });
 
-  const eventsForDay = (dateStr: string) => events.filter(e => e.date === dateStr);
-  const eventsForDayNum = (day: number) => eventsForDay(toDateStr(year, month, day));
+  const eventsForDayNum = (day: number) => events.filter(e => e.date === toDateStr(year, month, day));
   const todayStr = toDateStr(today.getFullYear(), today.getMonth(), today.getDate());
 
   const openDay = (day: number) => {
     setSelectedDay(day);
     setEditingEvent(null);
+    setDetailEvent(null);
     setError('');
-    setForm({ title: '', description: '', member_id: '', time: '' });
+    setForm({ title: '', description: '', member_ids: [], time: '' });
     setShowModal(true);
   };
 
   const openEdit = (ev: CalendarEvent) => {
+    setDetailEvent(null);
     setEditingEvent(ev);
     setError('');
-    setForm({ title: ev.title, description: ev.description, member_id: ev.member_id ? String(ev.member_id) : '', time: ev.time || '' });
+    let ids: number[] = [];
+    try { if (ev.member_ids) ids = JSON.parse(ev.member_ids); } catch {}
+    setForm({ title: ev.title, description: ev.description, member_ids: ids, time: ev.time || '' });
+  };
+
+  const toggleMember = (id: number) => {
+    setForm(f => ({
+      ...f,
+      member_ids: f.member_ids.includes(id)
+        ? f.member_ids.filter(x => x !== id)
+        : [...f.member_ids, id]
+    }));
   };
 
   const handleSubmit = async () => {
@@ -100,7 +110,8 @@ export default function Calendar() {
       const data = {
         title: form.title,
         description: form.description,
-        member_id: form.member_id ? Number(form.member_id) : null,
+        member_id: form.member_ids.length === 1 ? form.member_ids[0] : null,
+        member_ids: form.member_ids,
         date: editingEvent ? editingEvent.date : toDateStr(year, month, selectedDay!),
         time: form.time || '',
       };
@@ -108,7 +119,7 @@ export default function Calendar() {
       else await api.createEvent(data);
       await fetchMonthData();
       await fetchWeekData();
-      setForm({ title: '', description: '', member_id: '', time: '' });
+      setForm({ title: '', description: '', member_ids: [], time: '' });
       setEditingEvent(null);
       setShowModal(false);
     } catch (e: unknown) {
@@ -120,24 +131,36 @@ export default function Calendar() {
     await api.deleteEvent(id);
     await fetchMonthData();
     await fetchWeekData();
+    setDetailEvent(null);
+    setShowModal(false);
   };
 
+  const getMembersLabel = (ev: CalendarEvent) => {
+    if (ev.members_info && ev.members_info.length > 0) {
+      return ev.members_info.map(m => m.name).join(', ');
+    }
+    if (ev.member_name) return ev.member_name;
+    return 'Toute la famille';
+  };
+
+  // Day view
   const viewDateStr = dateToStr(viewDate);
   const dayEvts = weekEvents.filter(e => e.date === viewDateStr);
   const allDayEvts = dayEvts.filter(e => !e.time);
   const timedEvts = dayEvts.filter(e => !!e.time);
 
+  // Week view
   const monday = getMondayOf(viewDate);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
 
   return (
     <div>
+      {/* Monthly calendar */}
       <div className="calendar-nav">
         <button className="nav-btn" onClick={prevMonth}>‹</button>
         <h2>{MONTHS_FR[month]} {year}</h2>
         <button className="nav-btn" onClick={nextMonth}>›</button>
       </div>
-
       <div className="calendar-grid">
         {DAYS_FR.map(d => <div key={d} className="calendar-header-cell">{d}</div>)}
         {cells.map((day, i) => {
@@ -158,6 +181,7 @@ export default function Calendar() {
         })}
       </div>
 
+      {/* Day/Week toggle */}
       <div className="cal-section-header">
         <div className="view-toggle" style={{ marginBottom: 0 }}>
           <button className={`view-tab ${calView === 'day' ? 'active' : ''}`} onClick={() => setCalView('day')}>📅 Jour</button>
@@ -165,6 +189,7 @@ export default function Calendar() {
         </div>
       </div>
 
+      {/* Day view */}
       {calView === 'day' && (
         <div className="cal-day-view">
           <div className="month-nav">
@@ -179,9 +204,9 @@ export default function Calendar() {
             <div style={{ marginBottom: 8 }}>
               <div className="cal-time-label" style={{ fontWeight: 700, color: 'var(--text-2)', fontSize: 12 }}>TOUTE LA JOURNÉE</div>
               {allDayEvts.map(ev => (
-                <div key={ev.id} className="cal-day-event" style={{ borderLeftColor: ev.member_color || '#9CA3AF' }}>
+                <div key={ev.id} className="cal-day-event" style={{ borderLeftColor: ev.member_color || '#9CA3AF', cursor: 'pointer' }} onClick={() => setDetailEvent(ev)}>
                   <span className="cal-event-title">{ev.title}</span>
-                  {ev.member_name && <span className="cal-event-member"> · {ev.member_name}</span>}
+                  <span className="cal-event-member"> · {getMembersLabel(ev)}</span>
                 </div>
               ))}
             </div>
@@ -195,10 +220,10 @@ export default function Calendar() {
                 <div className="cal-time-label">{pad(h)}h</div>
                 <div className="cal-hour-content">
                   {slotEvts.map(ev => (
-                    <div key={ev.id} className="cal-day-event" style={{ borderLeftColor: ev.member_color || '#9CA3AF' }}>
+                    <div key={ev.id} className="cal-day-event" style={{ borderLeftColor: ev.member_color || '#9CA3AF', cursor: 'pointer' }} onClick={() => setDetailEvent(ev)}>
                       <span className="cal-event-time">{ev.time}</span>
                       <span className="cal-event-title"> {ev.title}</span>
-                      {ev.member_name && <span className="cal-event-member"> · {ev.member_name}</span>}
+                      <span className="cal-event-member"> · {getMembersLabel(ev)}</span>
                     </div>
                   ))}
                 </div>
@@ -215,6 +240,7 @@ export default function Calendar() {
         </div>
       )}
 
+      {/* Week view */}
       {calView === 'week' && (
         <div className="cal-week-view">
           <div className="month-nav">
@@ -224,7 +250,6 @@ export default function Calendar() {
             </span>
             <button className="nav-btn" onClick={() => setViewDate(d => addDays(d, 7))}>›</button>
           </div>
-
           <div className="cal-week-grid">
             {weekDays.map((d, i) => {
               const ds = dateToStr(d);
@@ -238,7 +263,7 @@ export default function Calendar() {
                   </div>
                   <div className="cal-week-events">
                     {de.map(ev => (
-                      <div key={ev.id} className="cal-week-event" style={{ backgroundColor: ev.member_color || '#9CA3AF' }}>
+                      <div key={ev.id} className="cal-week-event" style={{ backgroundColor: ev.member_color || '#9CA3AF', cursor: 'pointer' }} onClick={() => setDetailEvent(ev)}>
                         {ev.time && <span className="cal-week-time">{ev.time} </span>}
                         <span className="cal-week-title">{ev.title}</span>
                       </div>
@@ -251,19 +276,68 @@ export default function Calendar() {
         </div>
       )}
 
+      {/* Detail modal — click on event */}
+      {detailEvent && (
+        <Modal title={detailEvent.title} onClose={() => setDetailEvent(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {detailEvent.time && (
+              <div className="detail-row">
+                <span className="detail-icon">🕐</span>
+                <span>{detailEvent.time} · {detailEvent.date}</span>
+              </div>
+            )}
+            {!detailEvent.time && (
+              <div className="detail-row">
+                <span className="detail-icon">📅</span>
+                <span>{detailEvent.date}</span>
+              </div>
+            )}
+            <div className="detail-row">
+              <span className="detail-icon">👥</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {(detailEvent.members_info && detailEvent.members_info.length > 0)
+                  ? detailEvent.members_info.map(m => (
+                    <span key={m.id} style={{ background: m.color, color: 'white', borderRadius: 20, padding: '2px 10px', fontSize: 13, fontWeight: 600 }}>{m.name}</span>
+                  ))
+                  : detailEvent.member_name
+                    ? <span style={{ background: detailEvent.member_color || '#6B7280', color: 'white', borderRadius: 20, padding: '2px 10px', fontSize: 13, fontWeight: 600 }}>{detailEvent.member_name}</span>
+                    : <span style={{ color: 'var(--text-2)', fontSize: 14 }}>Toute la famille</span>
+                }
+              </div>
+            </div>
+            {detailEvent.description && (
+              <div className="detail-row">
+                <span className="detail-icon">📝</span>
+                <span style={{ fontSize: 15 }}>{detailEvent.description}</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <button className="btn-primary" style={{ flex: 1 }} onClick={() => {
+                setSelectedDay(parseInt(detailEvent.date.split('-')[2]));
+                openEdit(detailEvent);
+                setShowModal(true);
+                setDetailEvent(null);
+              }}>✏️ Modifier</button>
+              <button className="btn-secondary" style={{ color: 'var(--danger)', flex: 1 }} onClick={() => handleDelete(detailEvent.id)}>🗑️ Supprimer</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Add/Edit modal */}
       {showModal && selectedDay !== null && (
         <Modal title={`${selectedDay} ${MONTHS_FR[month]} ${year}`} onClose={() => { setShowModal(false); setEditingEvent(null); setError(''); }}>
           {!editingEvent && (
             <div className="event-list">
               {eventsForDayNum(selectedDay).map(ev => (
-                <div key={ev.id} className="event-item" style={{ borderLeftColor: ev.member_color || '#9CA3AF' }}>
+                <div key={ev.id} className="event-item" style={{ borderLeftColor: ev.member_color || '#9CA3AF', cursor: 'pointer' }} onClick={() => setDetailEvent(ev)}>
                   <div className="event-item-content">
                     {ev.time && <span className="event-time-badge">{ev.time}</span>}
                     <strong>{ev.title}</strong>
-                    {ev.member_name && <span className="event-member"> · {ev.member_name}</span>}
+                    <span className="event-member"> · {getMembersLabel(ev)}</span>
                     {ev.description && <p className="event-desc">{ev.description}</p>}
                   </div>
-                  <div className="event-actions">
+                  <div className="event-actions" onClick={e => e.stopPropagation()}>
                     <button className="btn-icon" onClick={() => openEdit(ev)}>✏️</button>
                     <button className="btn-icon" onClick={() => handleDelete(ev.id)}>🗑️</button>
                   </div>
@@ -273,36 +347,36 @@ export default function Calendar() {
           )}
 
           <div className="add-event-section">
-            <h3>{editingEvent ? 'Modifier l\'événement' : 'Ajouter un événement'}</h3>
+            <h3>{editingEvent ? 'Modifier' : 'Ajouter un événement'}</h3>
             {error && <div className="error-banner" style={{ marginBottom: 10 }}>{error}</div>}
             <label className="form-label">Titre *</label>
-            <input
-              className="input"
-              placeholder="Titre de l'événement"
-              value={form.title}
-              onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-            />
+            <input className="input" placeholder="Titre de l'événement" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
             <label className="form-label">Heure (optionnel)</label>
             <input className="input" type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} />
-            <label className="form-label">Membre concerné</label>
-            <select className="select" value={form.member_id} onChange={e => setForm(f => ({ ...f, member_id: e.target.value }))}>
-              <option value="">Toute la famille</option>
-              {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
+            <label className="form-label">Membres concernés</label>
+            <div className="member-checkboxes">
+              {members.map(m => (
+                <button
+                  key={m.id}
+                  type="button"
+                  className={`member-chip ${form.member_ids.includes(m.id) ? 'selected' : ''}`}
+                  style={form.member_ids.includes(m.id) ? { backgroundColor: m.color, borderColor: m.color } : {}}
+                  onClick={() => toggleMember(m.id)}
+                >
+                  {m.name}
+                </button>
+              ))}
+              {members.length === 0 && <span style={{ fontSize: 13, color: 'var(--text-2)' }}>Aucun membre</span>}
+            </div>
             <label className="form-label">Description (optionnel)</label>
-            <textarea className="textarea" placeholder="Détails..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+            <textarea className="textarea" placeholder="Lieu, détails..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
             <div className="modal-submit-sticky">
-              <button
-                className="btn-primary"
-                onClick={handleSubmit}
-                disabled={loading || !form.title.trim()}
-                style={{ width: '100%' }}
-              >
-                {loading ? 'Enregistrement...' : editingEvent ? '✓ Modifier' : '✓ Ajouter l\'événement'}
+              <button className="btn-primary" onClick={handleSubmit} disabled={loading || !form.title.trim()} style={{ width: '100%' }}>
+                {loading ? 'Enregistrement...' : editingEvent ? '✓ Modifier' : '✓ Ajouter'}
               </button>
               {editingEvent && (
-                <button className="btn-secondary" style={{ width: '100%', marginTop: 8 }} onClick={() => { setEditingEvent(null); setForm({ title: '', description: '', member_id: '', time: '' }); setError(''); }}>
-                  Annuler la modification
+                <button className="btn-secondary" style={{ width: '100%', marginTop: 8 }} onClick={() => { setEditingEvent(null); setForm({ title: '', description: '', member_ids: [], time: '' }); }}>
+                  Annuler
                 </button>
               )}
             </div>

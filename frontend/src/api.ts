@@ -53,6 +53,7 @@ export const api = {
   getMessages: () => req<unknown[]>('GET', '/messages'),
   sendMessage: (text: string) => req('POST', '/messages', { text }),
   deleteMessage: (id: number) => req('DELETE', `/messages/${id}`),
+  deleteEphemeral: (days: number) => req('DELETE', `/messages/ephemeral/${days}`),
 
   getEvents: (year?: number, month?: number, start_date?: string, end_date?: string) => {
     const p = new URLSearchParams();
@@ -61,7 +62,7 @@ export const api = {
     const q = p.toString() ? `?${p}` : '';
     return req<unknown[]>('GET', `/calendar${q}`);
   },
-  createEvent: (data: { title: string; date: string; time?: string; member_id?: number | null; description?: string }) =>
+  createEvent: (data: { title: string; date: string; time?: string; member_id?: number | null; member_ids?: number[]; description?: string }) =>
     req('POST', '/calendar', data),
   updateEvent: (id: number, data: unknown) => req('PUT', `/calendar/${id}`, data),
   deleteEvent: (id: number) => req('DELETE', `/calendar/${id}`),

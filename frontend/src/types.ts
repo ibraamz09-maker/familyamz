@@ -12,6 +12,7 @@ export interface Member {
   lat?: number | null;
   lng?: number | null;
   location_at?: string | null;
+  last_seen?: string | null;
 }
 
 export interface List {
@@ -42,12 +43,14 @@ export interface CalendarEvent {
   id: number;
   family_id: number;
   member_id: number | null;
+  member_ids?: string;
   title: string;
   date: string;
   time?: string;
   description: string;
   member_name?: string;
   member_color?: string;
+  members_info?: { id: number; name: string; color: string }[];
 }
 
 export interface Task {

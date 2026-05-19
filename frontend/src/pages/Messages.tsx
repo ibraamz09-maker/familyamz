@@ -8,6 +8,8 @@ export default function Messages() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -37,14 +39,21 @@ export default function Messages() {
       setText('');
       await fetchMessages();
       inputRef.current?.focus();
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleDelete = async (id: number) => {
     await api.deleteMessage(id);
     setMessages(m => m.filter(msg => msg.id !== id));
+  };
+
+  const handleEphemeral = async (days: number) => {
+    setDeleting(true);
+    try {
+      await api.deleteEphemeral(days);
+      await fetchMessages();
+      setShowSettings(false);
+    } finally { setDeleting(false); }
   };
 
   const senderName = member?.name || family?.name || 'Famille';
@@ -55,16 +64,42 @@ export default function Messages() {
     const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
     if (diffDays === 0) return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
     if (diffDays === 1) return `Hier ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
-    return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
   };
 
   return (
     <div className="chat-container">
+      {/* Bouton paramètres */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+        <button
+          style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--text-2)', padding: '4px 8px' }}
+          onClick={() => setShowSettings(!showSettings)}
+          title="Paramètres"
+        >⚙️</button>
+      </div>
+
+      {/* Panneau paramètres éphémères */}
+      {showSettings && (
+        <div style={{ background: 'var(--surface)', borderRadius: 12, padding: 14, marginBottom: 12, boxShadow: 'var(--shadow)' }}>
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>🗑️ Supprimer les messages de plus de :</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {[7, 14, 30].map(d => (
+              <button key={d} className="btn-secondary" disabled={deleting} style={{ flex: 1, fontSize: 13 }} onClick={() => handleEphemeral(d)}>
+                {d} jours
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 8 }}>
+            Les messages récents seront conservés.
+          </div>
+        </div>
+      )}
+
       <div className="chat-messages">
         {messages.length === 0 && (
           <div className="empty-state">
             <div className="empty-state-icon">💬</div>
-            <p>Aucun message pour l'instant</p>
+            <p>Aucun message</p>
             <p style={{ fontSize: 13, color: 'var(--text-2)' }}>Soyez le premier à écrire !</p>
           </div>
         )}
@@ -102,11 +137,7 @@ export default function Messages() {
           onChange={e => setText(e.target.value)}
           autoComplete="off"
         />
-        <button
-          type="submit"
-          className="chat-send-btn"
-          disabled={loading || !text.trim()}
-        >
+        <button type="submit" className="chat-send-btn" disabled={loading || !text.trim()}>
           {loading ? '…' : '➤'}
         </button>
       </form>

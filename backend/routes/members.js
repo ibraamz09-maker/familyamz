@@ -6,7 +6,11 @@ const { authMiddleware } = require('../middleware/auth');
 
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const result = await db.execute('SELECT id, family_id, name, color, lat, lng, location_at FROM members WHERE family_id = ? ORDER BY name', [req.user.familyId]);
+    // Mettre à jour last_seen du membre connecté
+    if (req.user.memberId) {
+      await db.execute('UPDATE members SET last_seen = CURRENT_TIMESTAMP WHERE id = ?', [req.user.memberId]).catch(() => {});
+    }
+    const result = await db.execute('SELECT id, family_id, name, color, lat, lng, location_at, last_seen FROM members WHERE family_id = ? ORDER BY name', [req.user.familyId]);
     res.json(result.rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
