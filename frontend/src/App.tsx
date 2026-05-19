@@ -35,6 +35,34 @@ export default function App() {
     return () => clearInterval(interval);
   }, [member]);
 
+  // Notifications push
+  useEffect(() => {
+    if (!family) return;
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+    const setupPush = async () => {
+      try {
+        const reg = await navigator.serviceWorker.register('/sw.js');
+        const existing = await reg.pushManager.getSubscription();
+        if (existing) {
+          // Déjà abonné, on re-synchronise avec le serveur
+          await api.subscribePush(existing.toJSON()).catch(() => {});
+          return;
+        }
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') return;
+        const { key } = await api.getVapidKey();
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: key,
+        });
+        await api.subscribePush(sub.toJSON());
+      } catch { /* ignore */ }
+    };
+
+    setupPush();
+  }, [family]);
+
   if (!family && !isAdmin) return <Login />;
   if (isAdmin) return <Admin />;
 

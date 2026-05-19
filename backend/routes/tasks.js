@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { db } = require('../db');
 const { authMiddleware } = require('../middleware/auth');
+const { notifyFamily } = require('../push');
 
 router.get('/', authMiddleware, async (req, res) => {
   try {
@@ -15,7 +16,9 @@ router.post('/', authMiddleware, async (req, res) => {
     const { title } = req.body;
     if (!title) return res.status(400).json({ error: 'Titre requis' });
     const result = await db.execute('INSERT INTO tasks (family_id, title) VALUES (?, ?)', [req.user.familyId, title]);
+    const senderName = req.user.memberName || req.user.name || 'Famille';
     res.json({ id: Number(result.lastInsertRowid), family_id: req.user.familyId, title, done: 0 });
+    notifyFamily(req.user.familyId, req.user.memberId, `✅ Nouvelle tâche`, `${senderName} a ajouté : ${title}`).catch(() => {});
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

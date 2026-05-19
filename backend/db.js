@@ -105,6 +105,19 @@ async function init() {
   `);
 
   // Migrations colonnes
+  // Table abonnements push
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      family_id INTEGER NOT NULL,
+      member_id INTEGER,
+      endpoint TEXT NOT NULL UNIQUE,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `).catch(() => {});
+
   try { await db.execute('ALTER TABLE receipts ADD COLUMN expense_id INTEGER'); } catch (e) {}
   try { await db.execute("ALTER TABLE events ADD COLUMN time TEXT DEFAULT ''"); } catch (e) {}
   try { await db.execute("ALTER TABLE members ADD COLUMN password_hash TEXT DEFAULT ''"); } catch (e) {}

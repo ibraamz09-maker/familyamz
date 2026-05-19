@@ -113,7 +113,9 @@ export default function Messages() {
                 </div>
               )}
               <div className="chat-bubble-wrap">
-                {!isMe && <div className="chat-sender">{msg.member_name}</div>}
+                <div className={`chat-sender ${isMe ? 'chat-sender-me' : ''}`}>
+                  {isMe ? 'Moi' : msg.member_name}
+                </div>
                 <div className={`chat-bubble ${isMe ? 'bubble-me' : 'bubble-other'}`}>
                   {msg.text}
                   {isMe && (

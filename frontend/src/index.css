@@ -988,6 +988,9 @@ html, body {
   margin-bottom: 2px;
   padding: 0 4px;
 }
+.chat-sender-me {
+  text-align: right;
+}
 .chat-bubble {
   position: relative;
   padding: 10px 14px;

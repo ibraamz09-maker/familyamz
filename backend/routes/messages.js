@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { db } = require('../db');
 const { authMiddleware } = require('../middleware/auth');
+const { notifyFamily } = require('../push');
 
 // GET last 100 messages
 router.get('/', authMiddleware, async (req, res) => {
@@ -42,7 +43,7 @@ router.post('/', authMiddleware, async (req, res) => {
       'INSERT INTO messages (family_id, member_id, member_name, member_color, text) VALUES (?, ?, ?, ?, ?)',
       [req.user.familyId, memberId, memberName, memberColor, text.trim()]
     );
-    res.json({
+    const msg = {
       id: Number(r.lastInsertRowid),
       family_id: req.user.familyId,
       member_id: memberId,
@@ -50,7 +51,10 @@ router.post('/', authMiddleware, async (req, res) => {
       member_color: memberColor,
       text: text.trim(),
       created_at: new Date().toISOString(),
-    });
+    };
+    res.json(msg);
+    // Notification push aux autres membres (sans await pour ne pas bloquer)
+    notifyFamily(req.user.familyId, memberId, `💬 ${memberName}`, text.trim()).catch(() => {});
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

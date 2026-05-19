@@ -38,6 +38,10 @@ export const api = {
     req('PUT', `/admin/families/${id}/password`, { password }),
 
   ping: () => req('POST', '/members/ping', {}),
+
+  getVapidKey: () => req<{ key: string }>('GET', '/push/vapid-public-key'),
+  subscribePush: (sub: object) => req('POST', '/push/subscribe', sub),
+  unsubscribePush: (endpoint: string) => req('POST', '/push/unsubscribe', { endpoint }),
   getMembers: () => req<unknown[]>('GET', '/members'),
   createMember: (data: { name: string; color: string; password?: string }) => req('POST', '/members', data),
   updateMember: (id: number, data: { name: string; color: string; password?: string }) => req('PUT', `/members/${id}`, data),

@@ -18,6 +18,7 @@ app.use('/api/expenses', require('./routes/expenses'));
 app.use('/api/receipts', require('./routes/receipts'));
 app.use('/api/lists', require('./routes/lists'));
 app.use('/api/messages', require('./routes/messages'));
+app.use('/api/push', require('./routes/push'));
 
 const frontendDist = path.join(__dirname, '../frontend/dist');
 app.use(express.static(frontendDist));
