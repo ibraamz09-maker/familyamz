@@ -351,6 +351,8 @@ export default function Expenses() {
                 const toCache = list.map(r => ({ ...r, data: '' }));
                 localStorage.setItem(RECEIPTS_CACHE_KEY, JSON.stringify(toCache));
               } catch { /* quota dépassé */ }
+            } catch (err) {
+              alert('❌ Erreur sauvegarde : ' + (err instanceof Error ? err.message : 'Vérifiez la connexion'));
             } finally { setLoading(false); }
           }}>
             <label className="form-label">Fichier (photo, screenshot, PDF)</label>
