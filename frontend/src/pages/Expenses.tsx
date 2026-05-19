@@ -69,6 +69,8 @@ export default function Expenses() {
     category: EXPENSE_CATEGORIES[0], description: '', member_id: '',
   });
 
+  const RECEIPTS_CACHE_KEY = 'familyamz_receipts_cache';
+
   const fetchData = useCallback(async () => {
     const [exps, mbrs] = await Promise.all([
       view === 'monthly' ? api.getExpenses(year, month + 1) : view === 'annual' ? api.getExpenses(year) : api.getExpenses(year),
@@ -77,9 +79,28 @@ export default function Expenses() {
     setExpenses(exps as Expense[]);
     setMembers(mbrs as Member[]);
     if (view === 'tickets') {
-      // Afficher tous les tickets (pas de filtre mois) pour ne rien perdre
-      const recs = await api.getReceipts();
-      setReceipts(recs as Receipt[]);
+      // Afficher d'abord le cache localStorage
+      try {
+        const cached = localStorage.getItem(RECEIPTS_CACHE_KEY);
+        if (cached) setReceipts(JSON.parse(cached));
+      } catch { /* ignore */ }
+      // Puis charger depuis le serveur
+      try {
+        const recs = await api.getReceipts();
+        const list = recs as Receipt[];
+        if (list.length > 0) {
+          setReceipts(list);
+          localStorage.setItem(RECEIPTS_CACHE_KEY, JSON.stringify(list));
+        } else {
+          // Serveur vide mais cache présent → garder le cache affiché
+          const cached = localStorage.getItem(RECEIPTS_CACHE_KEY);
+          if (cached) setReceipts(JSON.parse(cached));
+        }
+      } catch {
+        // Erreur réseau → garder le cache
+        const cached = localStorage.getItem(RECEIPTS_CACHE_KEY);
+        if (cached) setReceipts(JSON.parse(cached));
+      }
     }
   }, [view, year, month]);
 
@@ -294,7 +315,7 @@ export default function Expenses() {
                 </div>
                 <div className="receipt-actions">
                   <button className="btn-icon" onClick={() => { const a = document.createElement('a'); a.href = api.getReceiptFileUrl(r.id); a.download = r.filename; a.click(); }}>⬇️</button>
-                  <button className="btn-icon" onClick={async () => { await api.deleteReceipt(r.id); const recs = await api.getReceipts(year, month + 1); setReceipts(recs as Receipt[]); }}>🗑️</button>
+                  <button className="btn-icon" onClick={async () => { await api.deleteReceipt(r.id); const recs = await api.getReceipts(); const list = recs as Receipt[]; setReceipts(list); localStorage.setItem(RECEIPTS_CACHE_KEY, JSON.stringify(list)); }}>🗑️</button>
                 </div>
               </div>
             ))
@@ -321,8 +342,10 @@ export default function Expenses() {
                 member_id: receiptForm.member_id ? Number(receiptForm.member_id) : null,
               });
               setShowReceiptModal(false);
-              const recs = await api.getReceipts(year, month + 1);
-              setReceipts(recs as Receipt[]);
+              const recs = await api.getReceipts();
+              const list = recs as Receipt[];
+              setReceipts(list);
+              localStorage.setItem(RECEIPTS_CACHE_KEY, JSON.stringify(list));
             } finally { setLoading(false); }
           }}>
             <label className="form-label">Fichier (photo, screenshot, PDF)</label>

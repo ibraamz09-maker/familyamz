@@ -878,7 +878,7 @@ html, body {
   position: sticky;
   bottom: 0;
   background: var(--surface);
-  padding: 12px 0 4px;
+  padding: 12px 0 calc(10px + env(safe-area-inset-bottom, 0px));
   margin-top: 8px;
 }
 

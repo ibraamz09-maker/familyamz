@@ -93,11 +93,12 @@ export default function Calendar() {
   };
 
   const toggleMember = (id: number) => {
+    const nid = Number(id); // sécurité BigInt → number
     setForm(f => ({
       ...f,
-      member_ids: f.member_ids.includes(id)
-        ? f.member_ids.filter(x => x !== id)
-        : [...f.member_ids, id]
+      member_ids: f.member_ids.map(Number).includes(nid)
+        ? f.member_ids.filter(x => Number(x) !== nid)
+        : [...f.member_ids, nid]
     }));
   };
 
@@ -362,17 +363,20 @@ export default function Calendar() {
                 style={form.member_ids.length === 0 ? { backgroundColor: '#6B7280', borderColor: '#6B7280' } : {}}
                 onClick={() => setForm(f => ({ ...f, member_ids: [] }))}
               >👨‍👩‍👧‍👦 Toute la famille</button>
-              {members.map(m => (
-                <button
-                  key={m.id}
-                  type="button"
-                  className={`member-chip ${form.member_ids.includes(m.id) ? 'selected' : ''}`}
-                  style={form.member_ids.includes(m.id) ? { backgroundColor: m.color, borderColor: m.color } : {}}
-                  onClick={() => toggleMember(m.id)}
-                >
-                  {m.name}
-                </button>
-              ))}
+              {members.map(m => {
+                const selected = form.member_ids.map(Number).includes(Number(m.id));
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className={`member-chip ${selected ? 'selected' : ''}`}
+                    style={selected ? { backgroundColor: m.color, borderColor: m.color } : {}}
+                    onClick={() => toggleMember(m.id)}
+                  >
+                    {m.name}
+                  </button>
+                );
+              })}
             </div>
             {form.member_ids.length > 0 && (
               <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>
