@@ -12,6 +12,8 @@ export default function MapPage() {
   const [sharing, setSharing] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
   const [statusType, setStatusType] = useState<'info' | 'error' | 'success'>('info');
+  const [cityInput, setCityInput] = useState('');
+  const [showCityInput, setShowCityInput] = useState(false);
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
@@ -133,12 +135,44 @@ export default function MapPage() {
 
     /* Essai 1 : avec haute précision (GPS chip, meilleur sur iPhone) */
     navigator.geolocation.getCurrentPosition(success, (err) => {
-      if (err.code === 1) { error(err); return; }
+      if (err.code === 1) { error(err); setShowCityInput(true); return; }
       /* Essai 2 : sans haute précision (réseau) */
-      navigator.geolocation.getCurrentPosition(success, error, {
-        enableHighAccuracy: false, timeout: 30000, maximumAge: 0,
-      });
+      navigator.geolocation.getCurrentPosition(success, (err2) => {
+        error(err2);
+        setShowCityInput(true);
+      }, { enableHighAccuracy: false, timeout: 30000, maximumAge: 0 });
     }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+  };
+
+  const shareByCity = async () => {
+    if (!cityInput.trim() || !currentMember) return;
+    setSharing(true);
+    setStatusType('info');
+    setStatusMsg('🔍 Recherche de la ville...');
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityInput)}&format=json&limit=1`,
+        { headers: { 'Accept-Language': 'fr' } }
+      );
+      const data = await res.json();
+      if (!data || data.length === 0) {
+        setStatusType('error');
+        setStatusMsg('❌ Ville introuvable. Essaie avec un nom plus précis.');
+        setSharing(false);
+        return;
+      }
+      const { lat, lon } = data[0];
+      await api.updateLocation(currentMember.id, parseFloat(lat), parseFloat(lon));
+      setStatusType('success');
+      setStatusMsg(`✅ Position partagée : ${data[0].display_name.split(',').slice(0, 2).join(', ')}`);
+      setShowCityInput(false);
+      setCityInput('');
+      await fetchMembers();
+      setTimeout(() => setStatusMsg(''), 4000);
+    } catch {
+      setStatusType('error');
+      setStatusMsg('❌ Erreur lors de la recherche');
+    } finally { setSharing(false); }
   };
 
   const locatedMembers = members.filter(m => m.lat != null && m.lng != null);
@@ -164,6 +198,33 @@ export default function MapPage() {
           color: statusType === 'success' ? '#166534' : statusType === 'error' ? '#991B1B' : 'var(--primary-dark)',
         }}>
           {statusMsg}
+        </div>
+      )}
+
+      {/* Saisie manuelle de ville (fallback géoloc) */}
+      {showCityInput && currentMember && (
+        <div style={{ background: '#FEF3C7', borderRadius: 12, padding: 14, marginBottom: 12 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, color: '#92400E' }}>
+            📍 GPS non disponible — entre ta ville :
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              className="input"
+              style={{ marginBottom: 0, flex: 1 }}
+              placeholder="ex: Paris, Lyon, Marseille..."
+              value={cityInput}
+              onChange={e => setCityInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && shareByCity()}
+            />
+            <button
+              className="btn-primary"
+              style={{ width: 'auto', padding: '0 16px', whiteSpace: 'nowrap' }}
+              onClick={shareByCity}
+              disabled={sharing || !cityInput.trim()}
+            >
+              OK
+            </button>
+          </div>
         </div>
       )}
 
