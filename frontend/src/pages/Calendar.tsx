@@ -355,36 +355,46 @@ export default function Calendar() {
             <label className="form-label">Heure (optionnel)</label>
             <input className="input" type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} />
             <label className="form-label">Qui est concerné ?</label>
-            <div className="member-checkboxes">
-              {/* Toute la famille = aucun membre spécifique sélectionné */}
-              <button
-                type="button"
-                className={`member-chip ${form.member_ids.length === 0 ? 'selected' : ''}`}
-                style={form.member_ids.length === 0 ? { backgroundColor: '#6B7280', borderColor: '#6B7280' } : {}}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+              {/* Toute la famille */}
+              <div
                 onClick={() => setForm(f => ({ ...f, member_ids: [] }))}
-              >👨‍👩‍👧‍👦 Toute la famille</button>
+                style={{
+                  padding: '12px 16px', borderRadius: 12, cursor: 'pointer',
+                  border: `2px solid ${form.member_ids.length === 0 ? '#6B7280' : 'var(--border)'}`,
+                  background: form.member_ids.length === 0 ? '#F3F4F6' : 'var(--surface)',
+                  display: 'flex', alignItems: 'center', gap: 12, userSelect: 'none',
+                }}
+              >
+                <span style={{ fontSize: 22 }}>{form.member_ids.length === 0 ? '☑️' : '⬜'}</span>
+                <span style={{ fontWeight: 700, fontSize: 15 }}>👨‍👩‍👧‍👦 Toute la famille</span>
+              </div>
+              {/* Membres individuels */}
               {members.map(m => {
-                const selected = form.member_ids.map(Number).includes(Number(m.id));
+                const sel = form.member_ids.map(Number).includes(Number(m.id));
                 return (
-                  <button
+                  <div
                     key={m.id}
-                    type="button"
-                    className={`member-chip ${selected ? 'selected' : ''}`}
-                    style={selected ? { backgroundColor: m.color, borderColor: m.color } : {}}
                     onClick={() => toggleMember(m.id)}
+                    style={{
+                      padding: '12px 16px', borderRadius: 12, cursor: 'pointer',
+                      border: `2px solid ${sel ? m.color : 'var(--border)'}`,
+                      background: sel ? m.color + '18' : 'var(--surface)',
+                      display: 'flex', alignItems: 'center', gap: 12, userSelect: 'none',
+                    }}
                   >
-                    {m.name}
-                  </button>
+                    <span style={{ fontSize: 22 }}>{sel ? '☑️' : '⬜'}</span>
+                    <div style={{
+                      width: 30, height: 30, borderRadius: '50%',
+                      background: m.color, color: 'white', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontWeight: 800, fontSize: 13,
+                    }}>{m.name.charAt(0)}</div>
+                    <span style={{ fontWeight: 600, fontSize: 15 }}>{m.name}</span>
+                  </div>
                 );
               })}
             </div>
-            {form.member_ids.length > 0 && (
-              <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>
-                {form.member_ids.length === members.length
-                  ? '👨‍👩‍👧‍👦 Toute la famille sélectionnée'
-                  : `${form.member_ids.length} membre${form.member_ids.length > 1 ? 's' : ''} sélectionné${form.member_ids.length > 1 ? 's' : ''}`}
-              </div>
-            )}
             <label className="form-label">Description (optionnel)</label>
             <textarea className="textarea" placeholder="Lieu, détails..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
             <div className="modal-submit-sticky">
