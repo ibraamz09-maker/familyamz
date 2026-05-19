@@ -24,6 +24,8 @@ html, body {
   font-size: 16px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  /* Empêche iOS Safari de recharger la page en tirant vers le bas */
+  overscroll-behavior-y: contain;
 }
 
 #root { height: 100dvh; }

@@ -353,23 +353,15 @@ export default function Calendar() {
             <input className="input" placeholder="Titre de l'événement" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
             <label className="form-label">Heure (optionnel)</label>
             <input className="input" type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} />
-            <label className="form-label">Membres concernés</label>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+            <label className="form-label">Qui est concerné ?</label>
+            <div className="member-checkboxes">
+              {/* Toute la famille = aucun membre spécifique sélectionné */}
               <button
                 type="button"
-                className={`member-chip ${form.member_ids.length === members.length && members.length > 0 ? 'selected' : ''}`}
-                style={form.member_ids.length === members.length && members.length > 0 ? { backgroundColor: '#6B7280', borderColor: '#6B7280' } : {}}
-                onClick={() => setForm(f => ({ ...f, member_ids: members.map(m => m.id) }))}
+                className={`member-chip ${form.member_ids.length === 0 ? 'selected' : ''}`}
+                style={form.member_ids.length === 0 ? { backgroundColor: '#6B7280', borderColor: '#6B7280' } : {}}
+                onClick={() => setForm(f => ({ ...f, member_ids: [] }))}
               >👨‍👩‍👧‍👦 Toute la famille</button>
-              {form.member_ids.length > 0 && (
-                <button
-                  type="button"
-                  className="member-chip"
-                  onClick={() => setForm(f => ({ ...f, member_ids: [] }))}
-                >✕ Aucun</button>
-              )}
-            </div>
-            <div className="member-checkboxes">
               {members.map(m => (
                 <button
                   key={m.id}
@@ -381,8 +373,14 @@ export default function Calendar() {
                   {m.name}
                 </button>
               ))}
-              {members.length === 0 && <span style={{ fontSize: 13, color: 'var(--text-2)' }}>Aucun membre</span>}
             </div>
+            {form.member_ids.length > 0 && (
+              <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>
+                {form.member_ids.length === members.length
+                  ? '👨‍👩‍👧‍👦 Toute la famille sélectionnée'
+                  : `${form.member_ids.length} membre${form.member_ids.length > 1 ? 's' : ''} sélectionné${form.member_ids.length > 1 ? 's' : ''}`}
+              </div>
+            )}
             <label className="form-label">Description (optionnel)</label>
             <textarea className="textarea" placeholder="Lieu, détails..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
             <div className="modal-submit-sticky">
