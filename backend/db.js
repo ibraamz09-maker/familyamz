@@ -111,42 +111,39 @@ async function init() {
     console.log('Admin créé — identifiant: admin, mot de passe: admin123');
   }
 
-  // Création automatique d'une famille via variables d'environnement (privées, non visibles dans le code)
-  const FAMILY_IDENTIFIER = process.env.FAMILY_IDENTIFIER;
-  const FAMILY_NAME = process.env.FAMILY_NAME;
-  const FAMILY_PASSWORD = process.env.FAMILY_PASSWORD;
-  // Format: "Prénom:MotDePasse:#couleur,Prénom2:MotDePasse2:#couleur2"
-  const FAMILY_MEMBERS_RAW = process.env.FAMILY_MEMBERS;
+  // === FAMILLE AMENZOU — créée automatiquement si absente ===
+  const AMENZOU_ID = 'amenzou';
+  const AMENZOU_NAME = 'Amenzou';
+  const AMENZOU_PWD = 'Foad1974@';
+  const AMENZOU_MEMBERS = [
+    { name: 'Foad',    password: 'Foad1974',   color: '#3B82F6' },
+    { name: 'Ibrahim', password: 'Ibrahim2009', color: '#22C55E' },
+    { name: 'Imen',    password: 'Imen2005',    color: '#EC4899' },
+    { name: 'Assia',   password: 'Assia2004',   color: '#F97316' },
+    { name: 'Sabah',   password: 'Sabah2013',   color: '#8B5CF6' },
+  ];
 
-  if (FAMILY_IDENTIFIER && FAMILY_NAME && FAMILY_PASSWORD) {
-    let fam = await db.execute('SELECT id FROM families WHERE identifier = ?', [FAMILY_IDENTIFIER]);
-    if (!fam.rows[0]) {
-      const famHash = bcrypt.hashSync(FAMILY_PASSWORD, 10);
-      await db.execute('INSERT INTO families (identifier, password_hash, name) VALUES (?, ?, ?)', [FAMILY_IDENTIFIER, famHash, FAMILY_NAME]);
-      fam = await db.execute('SELECT id FROM families WHERE identifier = ?', [FAMILY_IDENTIFIER]);
-      console.log(`Famille créée: ${FAMILY_NAME}`);
-    }
-
-    if (fam.rows[0] && FAMILY_MEMBERS_RAW) {
-      const familyId = fam.rows[0].id;
-      const members = FAMILY_MEMBERS_RAW.split(',').map(m => {
-        const [name, password, color] = m.trim().split(':');
-        return { name, password, color: color || '#6B7280' };
-      });
-      for (const mp of members) {
-        if (!mp.name || !mp.password) continue;
-        const existing = await db.execute('SELECT id, password_hash FROM members WHERE family_id = ? AND name = ?', [familyId, mp.name]);
-        const hash = bcrypt.hashSync(mp.password, 10);
-        if (!existing.rows[0]) {
-          await db.execute('INSERT INTO members (family_id, name, color, password_hash) VALUES (?, ?, ?, ?)', [familyId, mp.name, mp.color, hash]);
-          console.log(`Membre créé: ${mp.name}`);
-        } else if (!existing.rows[0].password_hash) {
-          await db.execute('UPDATE members SET password_hash = ?, color = ? WHERE id = ?', [hash, mp.color, existing.rows[0].id]);
-          console.log(`Mot de passe mis à jour: ${mp.name}`);
-        }
+  let famRow = await db.execute('SELECT id FROM families WHERE identifier = ?', [AMENZOU_ID]);
+  if (!famRow.rows[0]) {
+    const h = bcrypt.hashSync(AMENZOU_PWD, 10);
+    await db.execute('INSERT INTO families (identifier, password_hash, name) VALUES (?, ?, ?)', [AMENZOU_ID, h, AMENZOU_NAME]);
+    famRow = await db.execute('SELECT id FROM families WHERE identifier = ?', [AMENZOU_ID]);
+    console.log('Famille Amenzou créée');
+  }
+  if (famRow.rows[0]) {
+    const fid = famRow.rows[0].id;
+    for (const mp of AMENZOU_MEMBERS) {
+      const ex = await db.execute('SELECT id, password_hash FROM members WHERE family_id = ? AND name = ?', [fid, mp.name]);
+      const h = bcrypt.hashSync(mp.password, 10);
+      if (!ex.rows[0]) {
+        await db.execute('INSERT INTO members (family_id, name, color, password_hash) VALUES (?, ?, ?, ?)', [fid, mp.name, mp.color, h]);
+        console.log(`Membre créé: ${mp.name}`);
+      } else if (!ex.rows[0].password_hash) {
+        await db.execute('UPDATE members SET password_hash = ?, color = ? WHERE id = ?', [h, mp.color, ex.rows[0].id]);
       }
     }
   }
+  // === FIN FAMILLE AMENZOU ===
 }
 
 module.exports = { db, init };
