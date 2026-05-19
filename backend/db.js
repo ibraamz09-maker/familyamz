@@ -70,10 +70,9 @@ async function init() {
     );
   `);
 
-  // Migration: ajouter expense_id si la colonne n'existe pas encore
-  try {
-    await db.execute('ALTER TABLE receipts ADD COLUMN expense_id INTEGER');
-  } catch (e) { /* colonne déjà existante */ }
+  // Migrations
+  try { await db.execute('ALTER TABLE receipts ADD COLUMN expense_id INTEGER'); } catch (e) {}
+  try { await db.execute("ALTER TABLE events ADD COLUMN time TEXT DEFAULT ''"); } catch (e) {}
 
   const res = await db.execute('SELECT id FROM admins WHERE username = ?', ['admin']);
   if (res.rows.length === 0) {

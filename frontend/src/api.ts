@@ -40,11 +40,14 @@ export const api = {
   updateMember: (id: number, data: { name: string; color: string }) => req('PUT', `/members/${id}`, data),
   deleteMember: (id: number) => req('DELETE', `/members/${id}`),
 
-  getEvents: (year?: number, month?: number) => {
-    const q = year && month ? `?year=${year}&month=${month}` : '';
+  getEvents: (year?: number, month?: number, start_date?: string, end_date?: string) => {
+    const p = new URLSearchParams();
+    if (start_date && end_date) { p.set('start_date', start_date); p.set('end_date', end_date); }
+    else if (year && month) { p.set('year', String(year)); p.set('month', String(month)); }
+    const q = p.toString() ? `?${p}` : '';
     return req<unknown[]>('GET', `/calendar${q}`);
   },
-  createEvent: (data: { title: string; date: string; member_id?: number | null; description?: string }) =>
+  createEvent: (data: { title: string; date: string; time?: string; member_id?: number | null; description?: string }) =>
     req('POST', '/calendar', data),
   updateEvent: (id: number, data: unknown) => req('PUT', `/calendar/${id}`, data),
   deleteEvent: (id: number) => req('DELETE', `/calendar/${id}`),

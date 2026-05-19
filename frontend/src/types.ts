@@ -17,6 +17,7 @@ export interface CalendarEvent {
   member_id: number | null;
   title: string;
   date: string;
+  time?: string;
   description: string;
   member_name?: string;
   member_color?: string;
