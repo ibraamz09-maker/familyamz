@@ -37,6 +37,7 @@ export const api = {
   updateFamilyPassword: (id: number, password: string) =>
     req('PUT', `/admin/families/${id}/password`, { password }),
 
+  health: () => req<{ ok: boolean; db: string; token: boolean; error?: string }>('GET', '/health'),
   ping: () => req('POST', '/members/ping', {}),
 
   getVapidKey: () => req<{ key: string }>('GET', '/push/vapid-public-key'),

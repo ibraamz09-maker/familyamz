@@ -20,6 +20,22 @@ app.use('/api/lists', require('./routes/lists'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/push', require('./routes/push'));
 
+// Diagnostic connexion base de données
+app.get('/api/health', async (req, res) => {
+  try {
+    const { db } = require('./db');
+    await db.execute('SELECT 1');
+    const url = process.env.TURSO_DATABASE_URL || '';
+    res.json({
+      ok: true,
+      db: url.startsWith('libsql://') ? 'turso' : 'sqlite-local',
+      token: !!process.env.TURSO_AUTH_TOKEN,
+    });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
 const frontendDist = path.join(__dirname, '../frontend/dist');
 app.use(express.static(frontendDist));
 app.get('*', (req, res) => {
