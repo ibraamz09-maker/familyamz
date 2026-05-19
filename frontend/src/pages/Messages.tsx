@@ -9,15 +9,18 @@ export default function Messages() {
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const fetchMessages = async () => {
-    const data = await api.getMessages();
-    setMessages(data as Message[]);
+    try {
+      const data = await api.getMessages();
+      setMessages(data as Message[]);
+    } catch { /* ignore */ }
   };
 
   useEffect(() => {
     fetchMessages();
-    const interval = setInterval(fetchMessages, 8000); // poll every 8s
+    const interval = setInterval(fetchMessages, 8000);
     return () => clearInterval(interval);
   }, []);
 
@@ -33,6 +36,7 @@ export default function Messages() {
       await api.sendMessage(text.trim());
       setText('');
       await fetchMessages();
+      inputRef.current?.focus();
     } finally {
       setLoading(false);
     }
@@ -78,13 +82,7 @@ export default function Messages() {
                 <div className={`chat-bubble ${isMe ? 'bubble-me' : 'bubble-other'}`}>
                   {msg.text}
                   {isMe && (
-                    <button
-                      className="chat-delete"
-                      onClick={() => handleDelete(msg.id)}
-                      title="Supprimer"
-                    >
-                      ×
-                    </button>
+                    <button className="chat-delete" onClick={() => handleDelete(msg.id)} title="Supprimer">×</button>
                   )}
                 </div>
                 <div className="chat-time">{formatTime(msg.created_at)}</div>
@@ -97,20 +95,19 @@ export default function Messages() {
 
       <form className="chat-input-bar" onSubmit={handleSend}>
         <input
-          className="input"
+          ref={inputRef}
+          className="chat-input-field"
           placeholder="Écrire un message..."
           value={text}
           onChange={e => setText(e.target.value)}
           autoComplete="off"
-          style={{ flex: 1, marginBottom: 0 }}
         />
         <button
           type="submit"
-          className="btn-primary"
+          className="chat-send-btn"
           disabled={loading || !text.trim()}
-          style={{ marginBottom: 0, padding: '0 20px', flexShrink: 0 }}
         >
-          {loading ? '...' : '➤'}
+          {loading ? '…' : '➤'}
         </button>
       </form>
     </div>

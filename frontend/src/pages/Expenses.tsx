@@ -77,7 +77,8 @@ export default function Expenses() {
     setExpenses(exps as Expense[]);
     setMembers(mbrs as Member[]);
     if (view === 'tickets') {
-      const recs = await api.getReceipts(year, month + 1);
+      // Afficher tous les tickets (pas de filtre mois) pour ne rien perdre
+      const recs = await api.getReceipts();
       setReceipts(recs as Receipt[]);
     }
   }, [view, year, month]);
@@ -275,10 +276,8 @@ export default function Expenses() {
 
       {view === 'tickets' && (
         <>
-          <div className="month-nav">
-            <button className="nav-btn" onClick={() => { if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1); }}>‹</button>
-            <span>{MONTHS_FR[month]} {year}</span>
-            <button className="nav-btn" onClick={() => { if (month === 11) { setMonth(0); setYear(y => y + 1); } else setMonth(m => m + 1); }}>›</button>
+          <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 10 }}>
+            🧾 {receipts.length} ticket{receipts.length > 1 ? 's' : ''} stocké{receipts.length > 1 ? 's' : ''} — tous téléchargeables
           </div>
           {receipts.length === 0 ? (
             <div className="empty-state">

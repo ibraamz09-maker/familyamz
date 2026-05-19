@@ -5,7 +5,7 @@ import Modal from '../components/Modal';
 
 const DAYS_FR = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 const DAYS_FULL = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
-const HOURS = Array.from({ length: 16 }, (_, i) => i + 7); // 7h à 22h
+const HOURS = Array.from({ length: 16 }, (_, i) => i + 7);
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 function toDateStr(y: number, m: number, d: number) { return `${y}-${pad(m + 1)}-${pad(d)}`; }
@@ -33,26 +33,31 @@ export default function Calendar() {
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [form, setForm] = useState({ title: '', description: '', member_id: '', time: '' });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [calView, setCalView] = useState<'day' | 'week'>('day');
   const [viewDate, setViewDate] = useState(new Date(today));
   const [weekEvents, setWeekEvents] = useState<CalendarEvent[]>([]);
 
   const fetchMonthData = useCallback(async () => {
-    const [evts, mbrs] = await Promise.all([
-      api.getEvents(year, month + 1),
-      api.getMembers(),
-    ]);
-    setEvents(evts as CalendarEvent[]);
-    setMembers(mbrs as Member[]);
+    try {
+      const [evts, mbrs] = await Promise.all([
+        api.getEvents(year, month + 1),
+        api.getMembers(),
+      ]);
+      setEvents(evts as CalendarEvent[]);
+      setMembers(mbrs as Member[]);
+    } catch { /* silently fail */ }
   }, [year, month]);
 
   useEffect(() => { fetchMonthData(); }, [fetchMonthData]);
 
   const fetchWeekData = useCallback(async () => {
-    const monday = getMondayOf(viewDate);
-    const sunday = addDays(monday, 6);
-    const evts = await api.getEvents(undefined, undefined, dateToStr(monday), dateToStr(sunday));
-    setWeekEvents(evts as CalendarEvent[]);
+    try {
+      const monday = getMondayOf(viewDate);
+      const sunday = addDays(monday, 6);
+      const evts = await api.getEvents(undefined, undefined, dateToStr(monday), dateToStr(sunday));
+      setWeekEvents(evts as CalendarEvent[]);
+    } catch { /* silently fail */ }
   }, [viewDate]);
 
   useEffect(() => { fetchWeekData(); }, [fetchWeekData]);
@@ -75,24 +80,28 @@ export default function Calendar() {
   const openDay = (day: number) => {
     setSelectedDay(day);
     setEditingEvent(null);
+    setError('');
     setForm({ title: '', description: '', member_id: '', time: '' });
     setShowModal(true);
   };
 
   const openEdit = (ev: CalendarEvent) => {
     setEditingEvent(ev);
+    setError('');
     setForm({ title: ev.title, description: ev.description, member_id: ev.member_id ? String(ev.member_id) : '', time: ev.time || '' });
   };
 
   const handleSubmit = async () => {
-    if (!form.title.trim() || selectedDay === null) return;
+    if (!form.title.trim()) return;
+    if (!editingEvent && selectedDay === null) return;
+    setError('');
     setLoading(true);
     try {
       const data = {
         title: form.title,
         description: form.description,
         member_id: form.member_id ? Number(form.member_id) : null,
-        date: editingEvent ? editingEvent.date : toDateStr(year, month, selectedDay),
+        date: editingEvent ? editingEvent.date : toDateStr(year, month, selectedDay!),
         time: form.time || '',
       };
       if (editingEvent) await api.updateEvent(editingEvent.id, data);
@@ -101,6 +110,9 @@ export default function Calendar() {
       await fetchWeekData();
       setForm({ title: '', description: '', member_id: '', time: '' });
       setEditingEvent(null);
+      setShowModal(false);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Erreur lors de l\'enregistrement');
     } finally { setLoading(false); }
   };
 
@@ -110,19 +122,16 @@ export default function Calendar() {
     await fetchWeekData();
   };
 
-  // --- Day view ---
   const viewDateStr = dateToStr(viewDate);
   const dayEvts = weekEvents.filter(e => e.date === viewDateStr);
   const allDayEvts = dayEvts.filter(e => !e.time);
   const timedEvts = dayEvts.filter(e => !!e.time);
 
-  // --- Week view ---
   const monday = getMondayOf(viewDate);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
 
   return (
     <div>
-      {/* Monthly calendar */}
       <div className="calendar-nav">
         <button className="nav-btn" onClick={prevMonth}>‹</button>
         <h2>{MONTHS_FR[month]} {year}</h2>
@@ -149,7 +158,6 @@ export default function Calendar() {
         })}
       </div>
 
-      {/* Day / Week view toggle */}
       <div className="cal-section-header">
         <div className="view-toggle" style={{ marginBottom: 0 }}>
           <button className={`view-tab ${calView === 'day' ? 'active' : ''}`} onClick={() => setCalView('day')}>📅 Jour</button>
@@ -157,7 +165,6 @@ export default function Calendar() {
         </div>
       </div>
 
-      {/* Day view */}
       {calView === 'day' && (
         <div className="cal-day-view">
           <div className="month-nav">
@@ -208,7 +215,6 @@ export default function Calendar() {
         </div>
       )}
 
-      {/* Week view */}
       {calView === 'week' && (
         <div className="cal-week-view">
           <div className="month-nav">
@@ -245,9 +251,8 @@ export default function Calendar() {
         </div>
       )}
 
-      {/* Modal */}
       {showModal && selectedDay !== null && (
-        <Modal title={`${selectedDay} ${MONTHS_FR[month]} ${year}`} onClose={() => { setShowModal(false); setEditingEvent(null); }}>
+        <Modal title={`${selectedDay} ${MONTHS_FR[month]} ${year}`} onClose={() => { setShowModal(false); setEditingEvent(null); setError(''); }}>
           {!editingEvent && (
             <div className="event-list">
               {eventsForDayNum(selectedDay).map(ev => (
@@ -269,8 +274,14 @@ export default function Calendar() {
 
           <div className="add-event-section">
             <h3>{editingEvent ? 'Modifier l\'événement' : 'Ajouter un événement'}</h3>
-            <label className="form-label">Titre</label>
-            <input className="input" placeholder="Titre de l'événement" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+            {error && <div className="error-banner" style={{ marginBottom: 10 }}>{error}</div>}
+            <label className="form-label">Titre *</label>
+            <input
+              className="input"
+              placeholder="Titre de l'événement"
+              value={form.title}
+              onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+            />
             <label className="form-label">Heure (optionnel)</label>
             <input className="input" type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} />
             <label className="form-label">Membre concerné</label>
@@ -281,11 +292,16 @@ export default function Calendar() {
             <label className="form-label">Description (optionnel)</label>
             <textarea className="textarea" placeholder="Détails..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
             <div className="modal-submit-sticky">
-              <button className="btn-primary" onClick={handleSubmit} disabled={loading || !form.title.trim()}>
-                {loading ? '...' : editingEvent ? 'Modifier' : 'Ajouter'}
+              <button
+                className="btn-primary"
+                onClick={handleSubmit}
+                disabled={loading || !form.title.trim()}
+                style={{ width: '100%' }}
+              >
+                {loading ? 'Enregistrement...' : editingEvent ? '✓ Modifier' : '✓ Ajouter l\'événement'}
               </button>
               {editingEvent && (
-                <button className="btn-secondary" onClick={() => { setEditingEvent(null); setForm({ title: '', description: '', member_id: '', time: '' }); }}>
+                <button className="btn-secondary" style={{ width: '100%', marginTop: 8 }} onClick={() => { setEditingEvent(null); setForm({ title: '', description: '', member_id: '', time: '' }); setError(''); }}>
                   Annuler la modification
                 </button>
               )}
