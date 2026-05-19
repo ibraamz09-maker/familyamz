@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import * as L from 'leaflet';
 import { api } from '../api';
 import { Member } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,10 +10,8 @@ export default function MapPage() {
   const [sharing, setSharing] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
   const mapRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mapInstanceRef = useRef<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const markersRef = useRef<any[]>([]);
+  const mapInstanceRef = useRef<L.Map | null>(null);
+  const markersRef = useRef<L.Marker[]>([]);
 
   const fetchMembers = async () => {
     const data = await api.getMembers();
@@ -21,42 +20,32 @@ export default function MapPage() {
 
   useEffect(() => {
     fetchMembers();
-    const interval = setInterval(fetchMembers, 30000); // refresh every 30s
+    const interval = setInterval(fetchMembers, 30000);
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
     if (!mapRef.current) return;
 
-    // Lazy-load Leaflet
-    import('leaflet').then(L => {
-      if (mapInstanceRef.current) {
-        // Update markers only
-        updateMarkers(L.default || L, members);
-        return;
-      }
-
-      const map = (L.default || L).map(mapRef.current!, {
-        center: [48.8566, 2.3522], // Paris default
+    if (!mapInstanceRef.current) {
+      const map = L.map(mapRef.current, {
+        center: [48.8566, 2.3522],
         zoom: 12,
       });
-
-      (L.default || L).tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors',
       }).addTo(map);
-
       mapInstanceRef.current = map;
-      updateMarkers(L.default || L, members);
-    });
+    }
+
+    updateMarkers(members);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [members]);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  function updateMarkers(L: any, memberList: Member[]) {
+  function updateMarkers(memberList: Member[]) {
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    // Remove old markers
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
 
@@ -162,7 +151,6 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* Member legend */}
       <div className="map-legend">
         {members.map(m => (
           <div key={m.id} className="map-legend-item">
