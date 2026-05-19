@@ -59,15 +59,14 @@ export default function MapPage() {
         setSharing(false);
         setStatusType('error');
         if (err.code === 1) {
-          setStatusMsg('🔒 Accès refusé. Sur iPhone : Réglages → Confidentialité → Service de localisation → Safari Sites web → "Lors de l\'utilisation"');
+          setStatusMsg('🔒 Accès refusé par Safari pour ce site. Solution : dans Safari, appuie sur "AA" (en haut à gauche de l\'adresse) → "Réglages du site web" → Localisation → Autoriser. Ou : Réglages iPhone → Confidentialité → Service de localisation → Safari Sites web → Lors de l\'utilisation.');
         } else if (err.code === 2) {
           setStatusMsg('❌ Position introuvable. Active le GPS et réessaie en extérieur.');
         } else {
           setStatusMsg('❌ Délai dépassé. Réessaie dans quelques secondes.');
         }
       },
-      // Pas de enableHighAccuracy pour meilleure compatibilité iOS
-      { timeout: 20000, maximumAge: 60000 }
+      { timeout: 30000, maximumAge: 0 }
     );
   };
 

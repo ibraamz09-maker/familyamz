@@ -354,6 +354,21 @@ export default function Calendar() {
             <label className="form-label">Heure (optionnel)</label>
             <input className="input" type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} />
             <label className="form-label">Membres concernés</label>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+              <button
+                type="button"
+                className={`member-chip ${form.member_ids.length === members.length && members.length > 0 ? 'selected' : ''}`}
+                style={form.member_ids.length === members.length && members.length > 0 ? { backgroundColor: '#6B7280', borderColor: '#6B7280' } : {}}
+                onClick={() => setForm(f => ({ ...f, member_ids: members.map(m => m.id) }))}
+              >👨‍👩‍👧‍👦 Toute la famille</button>
+              {form.member_ids.length > 0 && (
+                <button
+                  type="button"
+                  className="member-chip"
+                  onClick={() => setForm(f => ({ ...f, member_ids: [] }))}
+                >✕ Aucun</button>
+              )}
+            </div>
             <div className="member-checkboxes">
               {members.map(m => (
                 <button

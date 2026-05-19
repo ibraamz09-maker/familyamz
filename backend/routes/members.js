@@ -4,6 +4,16 @@ const bcrypt = require('bcryptjs');
 const { db } = require('../db');
 const { authMiddleware } = require('../middleware/auth');
 
+// Heartbeat : met à jour last_seen sans renvoyer tous les membres
+router.post('/ping', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.memberId) {
+      await db.execute('UPDATE members SET last_seen = CURRENT_TIMESTAMP WHERE id = ?', [req.user.memberId]);
+    }
+    res.json({ ok: true });
+  } catch { res.json({ ok: false }); }
+});
+
 router.get('/', authMiddleware, async (req, res) => {
   try {
     // Mettre à jour last_seen du membre connecté

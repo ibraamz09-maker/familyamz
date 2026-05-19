@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from './contexts/AuthContext';
+import { api } from './api';
 import Login from './pages/Login';
 import Admin from './pages/Admin';
 import Calendar from './pages/Calendar';
@@ -23,8 +24,16 @@ const TAB_TITLES: Record<Tab, string> = {
 };
 
 export default function App() {
-  const { family, isAdmin } = useAuth();
+  const { family, isAdmin, member } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('calendar');
+
+  // Heartbeat : met à jour last_seen toutes les 60 secondes
+  useEffect(() => {
+    if (!member) return;
+    api.ping().catch(() => {});
+    const interval = setInterval(() => api.ping().catch(() => {}), 60000);
+    return () => clearInterval(interval);
+  }, [member]);
 
   if (!family && !isAdmin) return <Login />;
   if (isAdmin) return <Admin />;

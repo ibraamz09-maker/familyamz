@@ -37,6 +37,7 @@ export const api = {
   updateFamilyPassword: (id: number, password: string) =>
     req('PUT', `/admin/families/${id}/password`, { password }),
 
+  ping: () => req('POST', '/members/ping', {}),
   getMembers: () => req<unknown[]>('GET', '/members'),
   createMember: (data: { name: string; color: string; password?: string }) => req('POST', '/members', data),
   updateMember: (id: number, data: { name: string; color: string; password?: string }) => req('PUT', `/members/${id}`, data),
