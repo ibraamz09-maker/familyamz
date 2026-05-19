@@ -9,6 +9,33 @@ export interface Member {
   family_id: number;
   name: string;
   color: string;
+  lat?: number | null;
+  lng?: number | null;
+  location_at?: string | null;
+}
+
+export interface List {
+  id: number;
+  family_id: number;
+  name: string;
+  items: ListItem[];
+}
+
+export interface ListItem {
+  id: number;
+  list_id: number;
+  text: string;
+  done: number;
+}
+
+export interface Message {
+  id: number;
+  family_id: number;
+  member_id: number | null;
+  member_name: string;
+  member_color: string;
+  text: string;
+  created_at: string;
 }
 
 export interface CalendarEvent {

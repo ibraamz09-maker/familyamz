@@ -27,6 +27,8 @@ export const api = {
     req<{ token: string; family: { id: number; identifier: string; name: string } }>('POST', '/auth/login', { identifier, password }),
   adminLogin: (username: string, password: string) =>
     req<{ token: string }>('POST', '/auth/admin/login', { username, password }),
+  memberLogin: (family_identifier: string, member_name: string, password: string) =>
+    req<{ token: string; family: { id: number; identifier: string; name: string }; member: { id: number; name: string; color: string } }>('POST', '/auth/member/login', { family_identifier, member_name, password }),
 
   getFamilies: () => req<unknown[]>('GET', '/admin/families'),
   createFamily: (data: { identifier: string; password: string; name: string }) =>
@@ -36,9 +38,21 @@ export const api = {
     req('PUT', `/admin/families/${id}/password`, { password }),
 
   getMembers: () => req<unknown[]>('GET', '/members'),
-  createMember: (data: { name: string; color: string }) => req('POST', '/members', data),
-  updateMember: (id: number, data: { name: string; color: string }) => req('PUT', `/members/${id}`, data),
+  createMember: (data: { name: string; color: string; password?: string }) => req('POST', '/members', data),
+  updateMember: (id: number, data: { name: string; color: string; password?: string }) => req('PUT', `/members/${id}`, data),
   deleteMember: (id: number) => req('DELETE', `/members/${id}`),
+  updateLocation: (id: number, lat: number, lng: number) => req('PUT', `/members/${id}/location`, { lat, lng }),
+
+  getLists: () => req<unknown[]>('GET', '/lists'),
+  createList: (name: string) => req('POST', '/lists', { name }),
+  deleteList: (id: number) => req('DELETE', `/lists/${id}`),
+  addListItem: (listId: number, text: string) => req('POST', `/lists/${listId}/items`, { text }),
+  toggleListItem: (listId: number, itemId: number, done: boolean) => req('PUT', `/lists/${listId}/items/${itemId}`, { done }),
+  deleteListItem: (listId: number, itemId: number) => req('DELETE', `/lists/${listId}/items/${itemId}`),
+
+  getMessages: () => req<unknown[]>('GET', '/messages'),
+  sendMessage: (text: string) => req('POST', '/messages', { text }),
+  deleteMessage: (id: number) => req('DELETE', `/messages/${id}`),
 
   getEvents: (year?: number, month?: number, start_date?: string, end_date?: string) => {
     const p = new URLSearchParams();

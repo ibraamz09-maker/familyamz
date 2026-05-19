@@ -37,4 +37,22 @@ router.post('/admin/login', async (req, res) => {
   }
 });
 
+router.post('/member/login', async (req, res) => {
+  try {
+    const { family_identifier, member_name, password } = req.body;
+    if (!family_identifier || !member_name || !password) return res.status(400).json({ error: 'Champs requis' });
+    const fam = await db.execute('SELECT * FROM families WHERE identifier = ?', [family_identifier]);
+    if (!fam.rows[0]) return res.status(401).json({ error: 'Famille introuvable' });
+    const family = fam.rows[0];
+    const mem = await db.execute('SELECT * FROM members WHERE family_id = ? AND name = ?', [family.id, member_name]);
+    if (!mem.rows[0]) return res.status(401).json({ error: 'Membre introuvable' });
+    const member = mem.rows[0];
+    if (!member.password_hash || !bcrypt.compareSync(password, member.password_hash)) {
+      return res.status(401).json({ error: 'Mot de passe incorrect' });
+    }
+    const token = jwt.sign({ familyId: family.id, memberId: member.id, memberName: member.name, memberColor: member.color, name: family.name }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ token, family: { id: family.id, identifier: family.identifier, name: family.name }, member: { id: member.id, name: member.name, color: member.color } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 module.exports = router;

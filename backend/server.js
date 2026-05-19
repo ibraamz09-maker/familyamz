@@ -16,6 +16,8 @@ app.use('/api/calendar', require('./routes/calendar'));
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/expenses', require('./routes/expenses'));
 app.use('/api/receipts', require('./routes/receipts'));
+app.use('/api/lists', require('./routes/lists'));
+app.use('/api/messages', require('./routes/messages'));
 
 const frontendDist = path.join(__dirname, '../frontend/dist');
 app.use(express.static(frontendDist));

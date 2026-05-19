@@ -6,15 +6,19 @@ import Calendar from './pages/Calendar';
 import Tasks from './pages/Tasks';
 import Expenses from './pages/Expenses';
 import Members from './pages/Members';
+import Messages from './pages/Messages';
+import MapPage from './pages/Map';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 
-type Tab = 'calendar' | 'tasks' | 'expenses' | 'members';
+type Tab = 'calendar' | 'tasks' | 'expenses' | 'messages' | 'map' | 'members';
 
 const TAB_TITLES: Record<Tab, string> = {
   calendar: 'Calendrier',
-  tasks: 'Tâches',
+  tasks: 'Tâches & Listes',
   expenses: 'Dépenses',
+  messages: 'Messages',
+  map: 'Carte famille',
   members: 'Membres',
 };
 
@@ -35,6 +39,8 @@ export default function App() {
         {activeTab === 'calendar' && <Calendar />}
         {activeTab === 'tasks' && <Tasks />}
         {activeTab === 'expenses' && <Expenses />}
+        {activeTab === 'messages' && <Messages />}
+        {activeTab === 'map' && <MapPage />}
         {activeTab === 'members' && <Members />}
       </main>
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
