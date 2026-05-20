@@ -111,4 +111,5 @@ export const api = {
     req<{ keyPrefix: string; results: { model: string; ok: boolean; response?: string; error?: string }[] }>('GET', '/receipts/test-gemini'),
   exportReceiptsYear: (year: number) => `/api/receipts/export/${year}?token=${getToken()}`,
   deleteReceiptsYear: (year: number) => req<{ ok: boolean; deleted: number }>('DELETE', `/receipts/year/${year}`),
+  getLocationToken: () => req<{ token: string }>('GET', '/location/token'),
 };

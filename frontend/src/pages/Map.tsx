@@ -15,6 +15,8 @@ export default function MapPage() {
   const [cityInput, setCityInput] = useState('');
   const [showCityInput, setShowCityInput] = useState(false);
   const [autoUpdate, setAutoUpdate] = useState(false);
+  const [locationUrl, setLocationUrl] = useState<string | null>(null);
+  const [showShortcut, setShowShortcut] = useState(false);
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
@@ -282,6 +284,61 @@ export default function MapPage() {
               OK
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Automatisation iOS Raccourcis */}
+      {currentMember && (
+        <div style={{ background: 'var(--surface)', borderRadius: 14, padding: '12px 14px', marginBottom: 12, boxShadow: 'var(--shadow)' }}>
+          <button
+            onClick={async () => {
+              if (!locationUrl) {
+                try {
+                  const res = await api.getLocationToken();
+                  const url = `https://familyamz.onrender.com/api/location/update?token=${res.token}&lat={latitude}&lng={longitude}`;
+                  setLocationUrl(url);
+                } catch { alert('Erreur lors de la génération du lien'); return; }
+              }
+              setShowShortcut(s => !s);
+            }}
+            style={{ width: '100%', background: 'none', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', padding: 0 }}
+          >
+            <span style={{ fontWeight: 700, fontSize: 14 }}>📱 Automatisation iPhone (app fermée)</span>
+            <span style={{ fontSize: 18 }}>{showShortcut ? '▲' : '▼'}</span>
+          </button>
+
+          {showShortcut && locationUrl && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 10, lineHeight: 1.6 }}>
+                Copie ce lien et suis les étapes pour que ton iPhone envoie ta position automatiquement toutes les 15 min, même app fermée :
+              </div>
+
+              {/* URL à copier */}
+              <div style={{ background: 'var(--bg)', borderRadius: 8, padding: '8px 10px', fontFamily: 'monospace', fontSize: 11, wordBreak: 'break-all', marginBottom: 10, color: 'var(--text)' }}>
+                {locationUrl}
+              </div>
+              <button
+                onClick={() => { navigator.clipboard.writeText(locationUrl); alert('✅ Lien copié !'); }}
+                style={{ width: '100%', padding: '10px', borderRadius: 8, background: 'var(--primary)', color: 'white', border: 'none', fontWeight: 700, fontSize: 14, cursor: 'pointer', marginBottom: 14 }}
+              >
+                📋 Copier le lien
+              </button>
+
+              {/* Instructions */}
+              <div style={{ fontSize: 13, lineHeight: 1.8, color: 'var(--text)' }}>
+                <strong>Configuration Raccourcis iPhone :</strong><br />
+                <span style={{ color: 'var(--text-2)' }}>
+                  1️⃣ Ouvre <strong>Raccourcis</strong> → onglet <strong>Automatisation</strong><br />
+                  2️⃣ <strong>+</strong> → <strong>Heure de la journée</strong><br />
+                  3️⃣ Mets une heure → active <strong>Répéter</strong> → toutes les <strong>15 min</strong> (ou 1h)<br />
+                  4️⃣ Ajoute action : <strong>Obtenir localisation actuelle</strong><br />
+                  5️⃣ Ajoute action : <strong>Obtenir le contenu de l'URL</strong><br />
+                  6️⃣ Colle le lien — remplace <code style={{background:'#eee', padding:'0 3px', borderRadius:3}}>{'{latitude}'}</code> et <code style={{background:'#eee', padding:'0 3px', borderRadius:3}}>{'{longitude}'}</code> par les variables de l'étape 4<br />
+                  7️⃣ Méthode : <strong>GET</strong> → Enregistrer
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
