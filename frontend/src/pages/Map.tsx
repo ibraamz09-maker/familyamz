@@ -53,23 +53,23 @@ export default function MapPage() {
     }
   }, [currentMember]);
 
-  // Mise à jour automatique de la position toutes les heures
+  // Suivi en temps réel avec watchPosition (se déclenche dès que tu bouges)
   useEffect(() => {
-    if (!autoUpdate || !currentMember) return;
-    const shareAuto = () => {
-      if (!navigator.geolocation) return;
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          await api.updateLocation(currentMember.id, pos.coords.latitude, pos.coords.longitude).catch(() => {});
-          await fetchMembers();
-        },
-        () => {}, // échec silencieux
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-      );
-    };
-    shareAuto(); // partage immédiat
-    const interval = setInterval(shareAuto, 60 * 60 * 1000); // toutes les heures
-    return () => clearInterval(interval);
+    if (!autoUpdate || !currentMember || !navigator.geolocation) return;
+    let lastSent = 0;
+    const watchId = navigator.geolocation.watchPosition(
+      async (pos) => {
+        // Throttle : envoyer au serveur max toutes les 15 secondes pour éviter la surcharge
+        const now = Date.now();
+        if (now - lastSent < 15000) return;
+        lastSent = now;
+        await api.updateLocation(currentMember.id, pos.coords.latitude, pos.coords.longitude).catch(() => {});
+        await fetchMembers();
+      },
+      () => {}, // échec silencieux
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+    return () => navigator.geolocation.clearWatch(watchId);
   }, [autoUpdate, currentMember]);
 
   /* Initialise la carte Leaflet une seule fois */
