@@ -453,11 +453,22 @@ export default function Expenses() {
             <input className="input" type="number" step="0.01" min="0" placeholder="0,00" value={receiptForm.amount} onChange={e => setReceiptForm(f => ({ ...f, amount: e.target.value }))} />
             <label className="form-label">Description (optionnel)</label>
             <input className="input" placeholder="ex: Facture EDF, Amazon..." value={receiptForm.description} onChange={e => setReceiptForm(f => ({ ...f, description: e.target.value }))} />
-            <label className="form-label">Membre concerné</label>
-            <select className="select" value={receiptForm.member_id} onChange={e => setReceiptForm(f => ({ ...f, member_id: e.target.value }))}>
-              <option value="">Toute la famille</option>
-              {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
+            <label className="form-label">Qui est concerné ?</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+              <button type="button" onClick={() => setReceiptForm(f => ({ ...f, member_id: '' }))}
+                style={{ padding: '8px 16px', borderRadius: 20, fontWeight: 700, fontSize: 14, cursor: 'pointer', border: `2px solid ${!receiptForm.member_id ? '#6B7280' : 'var(--border)'}`, background: !receiptForm.member_id ? '#6B7280' : 'var(--surface)', color: !receiptForm.member_id ? 'white' : 'var(--text)' }}>
+                👨‍👩‍👧‍👦 Tous
+              </button>
+              {members.map(m => {
+                const sel = receiptForm.member_id === String(m.id);
+                return (
+                  <button key={m.id} type="button" onClick={() => setReceiptForm(f => ({ ...f, member_id: sel ? '' : String(m.id) }))}
+                    style={{ padding: '8px 16px', borderRadius: 20, fontWeight: 700, fontSize: 14, cursor: 'pointer', border: `2px solid ${sel ? m.color : 'var(--border)'}`, background: sel ? m.color : 'var(--surface)', color: sel ? 'white' : 'var(--text)' }}>
+                    {m.name}
+                  </button>
+                );
+              })}
+            </div>
             <button className="btn-primary" type="submit" disabled={loading || analyzing || !receiptForm.data}>
               {analyzing ? '🔍 Analyse...' : loading ? '...' : 'Ajouter'}
             </button>
@@ -515,11 +526,22 @@ export default function Expenses() {
             <select className="select" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value as import('../types').ExpenseCategory }))}>
               {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
-            <label className="form-label">Membre concerné</label>
-            <select className="select" value={form.member_id} onChange={e => setForm(f => ({ ...f, member_id: e.target.value }))}>
-              <option value="">Toute la famille</option>
-              {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
+            <label className="form-label">Qui est concerné ?</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+              <button type="button" onClick={() => setForm(f => ({ ...f, member_id: '' }))}
+                style={{ padding: '8px 16px', borderRadius: 20, fontWeight: 700, fontSize: 14, cursor: 'pointer', border: `2px solid ${!form.member_id ? '#6B7280' : 'var(--border)'}`, background: !form.member_id ? '#6B7280' : 'var(--surface)', color: !form.member_id ? 'white' : 'var(--text)' }}>
+                👨‍👩‍👧‍👦 Tous
+              </button>
+              {members.map(m => {
+                const sel = form.member_id === String(m.id);
+                return (
+                  <button key={m.id} type="button" onClick={() => setForm(f => ({ ...f, member_id: sel ? '' : String(m.id) }))}
+                    style={{ padding: '8px 16px', borderRadius: 20, fontWeight: 700, fontSize: 14, cursor: 'pointer', border: `2px solid ${sel ? m.color : 'var(--border)'}`, background: sel ? m.color : 'var(--surface)', color: sel ? 'white' : 'var(--text)' }}>
+                    {m.name}
+                  </button>
+                );
+              })}
+            </div>
             <label className="form-label">Description (optionnel)</label>
             <input
               className="input"

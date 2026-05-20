@@ -365,43 +365,35 @@ export default function Calendar() {
             <label className="form-label">Heure (optionnel)</label>
             <input className="input" type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} />
             <label className="form-label">Qui est concerné ?</label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-              {/* Toute la famille */}
-              <div
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+              <button
+                type="button"
                 onClick={() => setForm(f => ({ ...f, member_ids: [] }))}
                 style={{
-                  padding: '12px 16px', borderRadius: 12, cursor: 'pointer',
+                  padding: '8px 16px', borderRadius: 20, fontWeight: 700, fontSize: 14, cursor: 'pointer',
                   border: `2px solid ${form.member_ids.length === 0 ? '#6B7280' : 'var(--border)'}`,
-                  background: form.member_ids.length === 0 ? '#F3F4F6' : 'var(--surface)',
-                  display: 'flex', alignItems: 'center', gap: 12, userSelect: 'none',
+                  background: form.member_ids.length === 0 ? '#6B7280' : 'var(--surface)',
+                  color: form.member_ids.length === 0 ? 'white' : 'var(--text)',
                 }}
               >
-                <span style={{ fontSize: 22 }}>{form.member_ids.length === 0 ? '☑️' : '⬜'}</span>
-                <span style={{ fontWeight: 700, fontSize: 15 }}>👨‍👩‍👧‍👦 Toute la famille</span>
-              </div>
-              {/* Membres individuels */}
+                👨‍👩‍👧‍👦 Tous
+              </button>
               {members.map(m => {
                 const sel = form.member_ids.map(Number).includes(Number(m.id));
                 return (
-                  <div
+                  <button
                     key={m.id}
+                    type="button"
                     onClick={() => toggleMember(m.id)}
                     style={{
-                      padding: '12px 16px', borderRadius: 12, cursor: 'pointer',
+                      padding: '8px 16px', borderRadius: 20, fontWeight: 700, fontSize: 14, cursor: 'pointer',
                       border: `2px solid ${sel ? m.color : 'var(--border)'}`,
-                      background: sel ? m.color + '18' : 'var(--surface)',
-                      display: 'flex', alignItems: 'center', gap: 12, userSelect: 'none',
+                      background: sel ? m.color : 'var(--surface)',
+                      color: sel ? 'white' : 'var(--text)',
                     }}
                   >
-                    <span style={{ fontSize: 22 }}>{sel ? '☑️' : '⬜'}</span>
-                    <div style={{
-                      width: 30, height: 30, borderRadius: '50%',
-                      background: m.color, color: 'white', flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontWeight: 800, fontSize: 13,
-                    }}>{m.name.charAt(0)}</div>
-                    <span style={{ fontWeight: 600, fontSize: 15 }}>{m.name}</span>
-                  </div>
+                    {m.name}
+                  </button>
                 );
               })}
             </div>
