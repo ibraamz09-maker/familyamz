@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '../api';
 
 type Theme = 'light' | 'dark' | 'rose' | 'blue';
 type FontSize = 'small' | 'medium' | 'large';
@@ -23,7 +24,11 @@ export function applyTheme(theme: Theme) {
 }
 
 export function applyFontSize(size: FontSize) {
+  const px = size === 'small' ? '14px' : size === 'large' ? '18px' : '16px';
   document.documentElement.setAttribute('data-font', size === 'medium' ? '' : size);
+  // Forcer sur html ET body pour passer au-dessus de "body { font-size: 16px }"
+  document.documentElement.style.fontSize = px;
+  document.body.style.fontSize = px;
   localStorage.setItem('familyamz_font', size);
 }
 
@@ -35,6 +40,45 @@ export default function Settings() {
   const [fontSize, setFontSize] = useState<FontSize>(
     () => (localStorage.getItem('familyamz_font') as FontSize) || 'medium'
   );
+  const [notifPerm, setNotifPerm] = useState<NotificationPermission | 'unsupported'>('default');
+  const [notifLoading, setNotifLoading] = useState(false);
+
+  useEffect(() => {
+    if (!('Notification' in window)) {
+      setNotifPerm('unsupported');
+    } else {
+      setNotifPerm(Notification.permission);
+    }
+  }, []);
+
+  const enableNotifications = async () => {
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+      alert('Les notifications push ne sont pas supportées sur cet appareil.\n\nSur iPhone : installez l\'app sur l\'écran d\'accueil (Partager → Sur l\'écran d\'accueil), puis réessayez.');
+      return;
+    }
+    setNotifLoading(true);
+    try {
+      const perm = await Notification.requestPermission();
+      setNotifPerm(perm);
+      if (perm === 'granted') {
+        const reg = await navigator.serviceWorker.register('/sw.js');
+        const existing = await reg.pushManager.getSubscription();
+        let sub = existing;
+        if (!existing) {
+          const { key } = await api.getVapidKey();
+          sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+        }
+        if (sub) await api.subscribePush(sub.toJSON());
+        alert('✅ Notifications activées ! Vous recevrez des alertes pour les messages, tâches et événements urgents.');
+      } else {
+        alert('❌ Notifications refusées.\n\nPour les activer : Réglages → Safari → Notifications → FamilyAmz → Autoriser');
+      }
+    } catch (e) {
+      alert('Erreur : ' + (e instanceof Error ? e.message : 'Impossible d\'activer les notifications'));
+    } finally {
+      setNotifLoading(false);
+    }
+  };
 
   const handleTheme = (t: Theme) => {
     setTheme(t);
@@ -115,6 +159,51 @@ export default function Settings() {
             <span style={{ fontWeight: 600, fontSize: 14 }}>{family?.name || '–'}</span>
           </div>
         </div>
+      </div>
+
+      {/* Notifications */}
+      <p className="section-title">Notifications push</p>
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+            <span style={{ fontSize: 22 }}>🔔</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>
+                {notifPerm === 'granted' ? 'Notifications activées ✅' :
+                 notifPerm === 'denied' ? 'Notifications bloquées ❌' :
+                 notifPerm === 'unsupported' ? 'Non supporté sur cet appareil' :
+                 'Notifications désactivées'}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>
+                {notifPerm === 'granted' ? 'Vous recevez des alertes en temps réel' :
+                 notifPerm === 'denied' ? 'Allez dans Réglages Safari pour les débloquer' :
+                 notifPerm === 'unsupported' ? 'Sur iPhone : installez l\'app sur l\'écran d\'accueil d\'abord' :
+                 'Appuyez pour recevoir des alertes messages, tâches...'}
+              </div>
+            </div>
+          </div>
+        </div>
+        {notifPerm !== 'denied' && notifPerm !== 'unsupported' && (
+          <button
+            onClick={enableNotifications}
+            disabled={notifLoading || notifPerm === 'granted'}
+            style={{
+              width: '100%', padding: '12px', borderRadius: 'var(--radius)',
+              background: notifPerm === 'granted' ? 'var(--bg)' : 'var(--primary)',
+              color: notifPerm === 'granted' ? 'var(--text-2)' : 'white',
+              border: notifPerm === 'granted' ? '1px solid var(--border)' : 'none',
+              fontWeight: 700, fontSize: 15, cursor: notifPerm === 'granted' ? 'default' : 'pointer',
+            }}
+          >
+            {notifLoading ? '...' : notifPerm === 'granted' ? '✅ Déjà activées' : '🔔 Activer les notifications'}
+          </button>
+        )}
+        {notifPerm === 'denied' && (
+          <div style={{ fontSize: 13, color: 'var(--danger)', background: '#FEE2E2', padding: '10px 12px', borderRadius: 8 }}>
+            Les notifications ont été refusées. Pour les réactiver :<br />
+            <strong>Réglages iPhone → Safari → {family?.name || 'ce site'} → Notifications → Autoriser</strong>
+          </div>
+        )}
       </div>
 
       {/* Déconnexion */}

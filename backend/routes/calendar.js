@@ -35,7 +35,9 @@ router.get('/', authMiddleware, async (req, res) => {
           membersInfo = ids.map(id => memberMap[id]).filter(Boolean);
         } catch {}
       }
-      return { ...ev, members_info: membersInfo };
+      // Si plusieurs membres sélectionnés, utiliser la couleur du premier pour les points calendrier
+      const effectiveColor = membersInfo.length > 0 ? membersInfo[0].color : (ev.member_color || null);
+      return { ...ev, members_info: membersInfo, member_color: effectiveColor };
     });
     res.json(events);
   } catch (e) { res.status(500).json({ error: e.message }); }

@@ -79,27 +79,20 @@ export default function Expenses() {
     setExpenses(exps as Expense[]);
     setMembers(mbrs as Member[]);
     if (view === 'tickets') {
-      // Afficher d'abord le cache localStorage
+      // Afficher d'abord le cache localStorage (affichage immédiat)
       try {
         const cached = localStorage.getItem(RECEIPTS_CACHE_KEY);
         if (cached) setReceipts(JSON.parse(cached));
       } catch { /* ignore */ }
-      // Puis charger depuis le serveur
+      // Puis charger depuis le serveur — TOUJOURS utiliser les données serveur
       try {
         const recs = await api.getReceipts();
         const list = recs as Receipt[];
-        if (list.length > 0) {
-          setReceipts(list);
-          // Stocker SANS le champ data (base64 image trop grande pour localStorage)
-          const toCache = list.map(r => ({ ...r, data: '' }));
-          try { localStorage.setItem(RECEIPTS_CACHE_KEY, JSON.stringify(toCache)); } catch { /* quota */ }
-        } else {
-          // Serveur vide mais cache présent → garder le cache affiché
-          const cached = localStorage.getItem(RECEIPTS_CACHE_KEY);
-          if (cached) setReceipts(JSON.parse(cached));
-        }
+        setReceipts(list); // Toujours utiliser les données serveur, même si vide
+        const toCache = list.map(r => ({ ...r, data: '' }));
+        try { localStorage.setItem(RECEIPTS_CACHE_KEY, JSON.stringify(toCache)); } catch { /* quota */ }
       } catch {
-        // Erreur réseau → garder le cache
+        // Erreur réseau uniquement → garder le cache
         const cached = localStorage.getItem(RECEIPTS_CACHE_KEY);
         if (cached) setReceipts(JSON.parse(cached));
       }
@@ -344,6 +337,10 @@ export default function Expenses() {
                 member_id: receiptForm.member_id ? Number(receiptForm.member_id) : null,
               });
               setShowReceiptModal(false);
+              // Réinitialiser le formulaire
+              setReceiptPreview(null);
+              setReceiptForm({ filename: '', mimetype: '', data: '', amount: '', date: today.toISOString().slice(0, 10), category: EXPENSE_CATEGORIES[0], description: '', member_id: '' });
+              // Rafraîchir la liste
               const recs = await api.getReceipts();
               const list = recs as Receipt[];
               setReceipts(list);
@@ -352,48 +349,63 @@ export default function Expenses() {
                 localStorage.setItem(RECEIPTS_CACHE_KEY, JSON.stringify(toCache));
               } catch { /* quota dépassé */ }
             } catch (err) {
-              alert('❌ Erreur sauvegarde : ' + (err instanceof Error ? err.message : 'Vérifiez la connexion'));
+              alert('❌ Erreur de sauvegarde : ' + (err instanceof Error ? err.message : 'Vérifiez la connexion'));
             } finally { setLoading(false); }
           }}>
-            <label className="form-label">Fichier (photo, screenshot, PDF)</label>
-            <div className="upload-zone" onClick={() => !analyzing && fileRef.current?.click()}>
-              {analyzing ? (
-                <div style={{ padding: 28, color: 'var(--primary)', textAlign: 'center' }}>
-                  <div style={{ fontSize: 28 }}>🔍</div>
-                  <div style={{ marginTop: 8, fontSize: 14, fontWeight: 600 }}>Analyse en cours...</div>
-                </div>
-              ) : receiptPreview ? (
-                <img src={receiptPreview} alt="aperçu" style={{ maxWidth: '100%', maxHeight: 160, borderRadius: 8 }} />
-              ) : receiptForm.filename ? (
-                <div style={{ padding: 20 }}>📄 {receiptForm.filename}</div>
-              ) : (
-                <div style={{ padding: 28, color: 'var(--text-2)', textAlign: 'center' }}>
-                  <div style={{ fontSize: 32 }}>📎</div>
-                  <div style={{ marginTop: 8, fontSize: 14 }}>Appuie pour choisir un fichier</div>
-                </div>
-              )}
-            </div>
-            <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              const compressed = await compressImage(file);
-              setReceiptForm(f => ({ ...f, ...compressed }));
-              if (compressed.mimetype.startsWith('image/')) setReceiptPreview(`data:${compressed.mimetype};base64,${compressed.data}`);
-              else setReceiptPreview(null);
-              // Analyse automatique avec Gemini
-              setAnalyzing(true);
-              try {
-                const result = await api.analyzeReceipt(compressed.data, compressed.mimetype);
-                setReceiptForm(f => ({
-                  ...f,
-                  amount: result.amount != null ? String(result.amount) : f.amount,
-                  date: result.date || f.date,
-                  category: (result.category as import('../types').ExpenseCategory) || f.category,
-                  description: result.description || f.description,
-                }));
-              } catch (err) { /* ignore */ }
-              finally { setAnalyzing(false); }
-            }} />
+            <label className="form-label">Photo du ticket</label>
+            {/* Utiliser un label HTML pour déclencher l'input — fiable sur iOS */}
+            <label htmlFor="receipt-file-upload" style={{ display: 'block', cursor: analyzing ? 'default' : 'pointer' }}>
+              <div className="upload-zone" style={{ pointerEvents: 'none' }}>
+                {analyzing ? (
+                  <div style={{ padding: 28, color: 'var(--primary)', textAlign: 'center' }}>
+                    <div style={{ fontSize: 28 }}>🔍</div>
+                    <div style={{ marginTop: 8, fontSize: 14, fontWeight: 600 }}>Analyse Gemini en cours...</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 4 }}>Extraction du montant et de la date</div>
+                  </div>
+                ) : receiptPreview ? (
+                  <img src={receiptPreview} alt="aperçu" style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8 }} />
+                ) : receiptForm.filename ? (
+                  <div style={{ padding: 20 }}>📄 {receiptForm.filename}</div>
+                ) : (
+                  <div style={{ padding: 28, color: 'var(--text-2)', textAlign: 'center' }}>
+                    <div style={{ fontSize: 40 }}>📷</div>
+                    <div style={{ marginTop: 8, fontSize: 15, fontWeight: 600 }}>Appuie pour prendre une photo</div>
+                    <div style={{ fontSize: 12, marginTop: 4 }}>ou choisir dans la galerie</div>
+                  </div>
+                )}
+              </div>
+            </label>
+            <input
+              id="receipt-file-upload"
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              style={{ display: 'none' }}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const compressed = await compressImage(file);
+                setReceiptForm(f => ({ ...f, ...compressed }));
+                if (compressed.mimetype.startsWith('image/')) setReceiptPreview(`data:${compressed.mimetype};base64,${compressed.data}`);
+                else setReceiptPreview(null);
+                // Analyse automatique avec Gemini (si disponible)
+                setAnalyzing(true);
+                try {
+                  const result = await api.analyzeReceipt(compressed.data, compressed.mimetype);
+                  if (result.description || result.amount != null) {
+                    setReceiptForm(f => ({
+                      ...f,
+                      amount: result.amount != null ? String(result.amount) : f.amount,
+                      date: result.date || f.date,
+                      category: (result.category as import('../types').ExpenseCategory) || f.category,
+                      description: result.description || f.description,
+                    }));
+                  }
+                } catch { /* Gemini non disponible, l'utilisateur remplit manuellement */ }
+                finally { setAnalyzing(false); }
+              }}
+            />
             <label className="form-label">Catégorie</label>
             <select className="select" value={receiptForm.category} onChange={e => setReceiptForm(f => ({ ...f, category: e.target.value as import('../types').ExpenseCategory }))}>
               {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
