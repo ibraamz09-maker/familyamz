@@ -25,11 +25,11 @@ export function applyTheme(theme: Theme) {
 }
 
 export function applyFontSize(size: FontSize) {
-  const px = size === 'small' ? '14px' : size === 'large' ? '18px' : '16px';
+  // Zoom sur toute l'app — la seule méthode fiable quand le CSS utilise des px fixes
+  const zoom = size === 'small' ? '0.88' : size === 'large' ? '1.14' : '1';
+  const app = document.querySelector<HTMLElement>('.app');
+  if (app) app.style.zoom = zoom;
   document.documentElement.setAttribute('data-font', size === 'medium' ? '' : size);
-  // Forcer sur html ET body pour passer au-dessus de "body { font-size: 16px }"
-  document.documentElement.style.fontSize = px;
-  document.body.style.fontSize = px;
   localStorage.setItem('familyamz_font', size);
 }
 
