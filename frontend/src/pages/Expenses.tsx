@@ -50,7 +50,7 @@ function compressImage(file: File): Promise<{ data: string; mimetype: string; fi
     const url = URL.createObjectURL(file);
     img.onload = () => {
       URL.revokeObjectURL(url);
-      const MAX = 1200;
+      const MAX = 900; // Réduit pour alléger le stockage Turso
       let w = img.width, h = img.height;
       if (w > MAX || h > MAX) {
         if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
@@ -59,7 +59,7 @@ function compressImage(file: File): Promise<{ data: string; mimetype: string; fi
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.65);
       resolve({ data: dataUrl.split(',')[1], mimetype: 'image/jpeg', filename: file.name.replace(/\.[^.]+$/, '.jpg') });
     };
     img.src = url;
@@ -348,8 +348,24 @@ export default function Expenses() {
 
       {view === 'tickets' && (
         <>
-          <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 10 }}>
-            🧾 {receipts.length} ticket{receipts.length > 1 ? 's' : ''} stocké{receipts.length > 1 ? 's' : ''} — tous téléchargeables
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
+              🧾 {receipts.length} ticket{receipts.length > 1 ? 's' : ''} stocké{receipts.length > 1 ? 's' : ''}
+            </span>
+            <button
+              className="btn-secondary"
+              style={{ fontSize: 12, padding: '4px 12px' }}
+              onClick={async () => {
+                try {
+                  const recs = await api.getReceipts();
+                  const list = recs as Receipt[];
+                  setReceipts(list);
+                  localStorage.setItem(RECEIPTS_CACHE_KEY, JSON.stringify(list.map(r => ({ ...r, data: '' }))));
+                } catch { alert('Erreur de chargement — vérifiez votre connexion'); }
+              }}
+            >
+              🔄 Actualiser
+            </button>
           </div>
           {receipts.length === 0 ? (
             <div className="empty-state">
@@ -392,25 +408,37 @@ export default function Expenses() {
             if (!receiptForm.data) return;
             setLoading(true);
             try {
-              await api.createReceipt({
+              const saved = await api.createReceipt({
                 filename: receiptForm.filename, mimetype: receiptForm.mimetype, data: receiptForm.data,
                 amount: receiptForm.amount ? parseFloat(receiptForm.amount.replace(',', '.')) : null,
                 date: receiptForm.date, category: receiptForm.category,
                 description: receiptForm.description,
                 member_id: receiptForm.member_id ? Number(receiptForm.member_id) : null,
               });
+              // Affichage immédiat sans attendre le serveur
+              const newReceipt: Receipt = {
+                id: saved.id,
+                filename: receiptForm.filename,
+                mimetype: receiptForm.mimetype,
+                amount: receiptForm.amount ? parseFloat(receiptForm.amount.replace(',', '.')) : null,
+                date: receiptForm.date,
+                category: receiptForm.category,
+                description: receiptForm.description,
+                member_id: receiptForm.member_id ? Number(receiptForm.member_id) : null,
+                created_at: new Date().toISOString(),
+              };
+              setReceipts(prev => [newReceipt, ...prev]);
               setShowReceiptModal(false);
-              // Réinitialiser le formulaire
               setReceiptPreview(null);
               setReceiptForm({ filename: '', mimetype: '', data: '', amount: '', date: today.toISOString().slice(0, 10), category: EXPENSE_CATEGORIES[0], description: '', member_id: '' });
-              // Rafraîchir la liste
-              const recs = await api.getReceipts();
-              const list = recs as Receipt[];
-              setReceipts(list);
-              try {
-                const toCache = list.map(r => ({ ...r, data: '' }));
-                localStorage.setItem(RECEIPTS_CACHE_KEY, JSON.stringify(toCache));
-              } catch { /* quota dépassé */ }
+              // Sync serveur en arrière-plan
+              api.getReceipts().then(recs => {
+                const list = recs as Receipt[];
+                if (list.length > 0) {
+                  setReceipts(list);
+                  try { localStorage.setItem(RECEIPTS_CACHE_KEY, JSON.stringify(list.map(r => ({ ...r, data: '' })))); } catch { /* quota */ }
+                }
+              }).catch(() => {});
             } catch (err) {
               alert('❌ Erreur de sauvegarde : ' + (err instanceof Error ? err.message : 'Vérifiez la connexion'));
             } finally { setLoading(false); }
