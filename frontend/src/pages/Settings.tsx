@@ -214,40 +214,6 @@ export default function Settings() {
         )}
       </div>
 
-      {/* Clé Gemini */}
-      <p className="section-title">Analyse automatique des tickets</p>
-      <div className="card" style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 10 }}>
-          🤖 Clé API Gemini pour l'analyse automatique des tickets de caisse.
-          Obtiens-la sur <strong>aistudio.google.com</strong> → "Get API key" (gratuit)
-        </div>
-        <input
-          className="input"
-          type="password"
-          placeholder="AIza... (colle ta clé ici)"
-          value={geminiKey}
-          onChange={e => setGeminiKey(e.target.value)}
-          style={{ marginBottom: 8 }}
-        />
-        <button
-          className="btn-primary"
-          onClick={saveGeminiKey}
-          style={{ width: '100%', padding: '12px' }}
-        >
-          {geminiSaved ? '✅ Sauvegardé !' : '💾 Enregistrer la clé'}
-        </button>
-        {geminiKey && !geminiSaved && (
-          <div style={{ fontSize: 12, color: 'var(--success, #16a34a)', marginTop: 8 }}>
-            ✅ Clé configurée — l'analyse automatique est active
-          </div>
-        )}
-        {!geminiKey && (
-          <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 8 }}>
-            Sans clé, tu peux quand même remplir les tickets manuellement.
-          </div>
-        )}
-      </div>
-
       {/* Déconnexion */}
       <p className="section-title">Compte</p>
       <div className="card">

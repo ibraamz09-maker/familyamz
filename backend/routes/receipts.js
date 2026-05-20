@@ -2,29 +2,22 @@ const express = require('express');
 const router = express.Router();
 const { db } = require('../db');
 const { authMiddleware } = require('../middleware/auth');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-
 const CATEGORIES = ['Loisirs', 'Vêtements', 'Abonnements', 'Électricité', 'Essence', 'Autres'];
 
 async function analyzeWithGemini(base64Data, mimetype) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     const today = new Date().toISOString().slice(0, 10);
-    const prompt = `Analyse ce ticket de caisse ou cette facture et extrais les informations suivantes en JSON.
-Catégories disponibles: ${CATEGORIES.join(', ')}.
-Date du jour si non trouvée: ${today}.
-
-Réponds UNIQUEMENT avec ce JSON (sans markdown) :
-{"amount": <montant total en nombre décimal ou null>, "date": "<date au format YYYY-MM-DD ou ${today}>", "category": "<une des catégories>", "description": "<nom du magasin ou service>"}`;
-
-    const result = await model.generateContent([
-      { inlineData: { data: base64Data, mimeType: mimetype } },
-      prompt
-    ]);
-    const text = result.response.text().trim();
+    const prompt = `Analyse ce ticket de caisse ou cette facture. Catégories disponibles: ${CATEGORIES.join(', ')}. Date du jour si non trouvée: ${today}. Réponds UNIQUEMENT avec ce JSON sans markdown: {"amount": <montant total décimal ou null>, "date": "<YYYY-MM-DD>", "category": "<une des catégories>", "description": "<nom du magasin>"}`;
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ inline_data: { mime_type: mimetype, data: base64Data } }, { text: prompt }] }] }),
+    });
+    const data = await response.json();
+    if (data.error) { console.error('Gemini error:', data.error.message); return null; }
+    const text = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim().replace(/```json\n?|\n?```/g, '');
     return JSON.parse(text);
   } catch (e) {
     console.error('Gemini error:', e.message);

@@ -99,13 +99,16 @@ export default function Expenses() {
 
   const RECEIPTS_CACHE_KEY = 'familyamz_receipts_cache';
 
+  // Charger les membres séparément (comme Calendar) pour ne pas bloquer les dépenses
+  useEffect(() => {
+    api.getMembers().then(mbrs => setMembers(mbrs as Member[])).catch(() => {});
+  }, []);
+
   const fetchData = useCallback(async () => {
-    const [exps, mbrs] = await Promise.all([
-      view === 'monthly' ? api.getExpenses(year, month + 1) : view === 'annual' ? api.getExpenses(year) : api.getExpenses(year),
-      api.getMembers(),
-    ]);
-    setExpenses(exps as Expense[]);
-    setMembers(mbrs as Member[]);
+    try {
+      const exps = await (view === 'monthly' ? api.getExpenses(year, month + 1) : api.getExpenses(year));
+      setExpenses(exps as Expense[]);
+    } catch { /* ignore réseau */ }
     if (view === 'tickets') {
       // Afficher d'abord le cache localStorage (affichage immédiat)
       try {
@@ -449,23 +452,26 @@ export default function Expenses() {
                 setReceiptForm(f => ({ ...f, ...compressed }));
                 if (compressed.mimetype.startsWith('image/')) setReceiptPreview(`data:${compressed.mimetype};base64,${compressed.data}`);
                 else setReceiptPreview(null);
-                // Analyse automatique avec Gemini (directement depuis le navigateur)
-                const hasKey = !!localStorage.getItem('familyamz_gemini_key')?.trim();
-                if (hasKey) {
-                  setAnalyzing(true);
+                // Analyse automatique avec Gemini
+                setAnalyzing(true);
+                try {
+                  // Essayer le serveur d'abord, puis clé locale en fallback
+                  let result = null;
                   try {
-                    const result = await analyzeWithGemini(compressed.data, compressed.mimetype);
-                    if (result && (result.description || result.amount != null)) {
-                      setReceiptForm(f => ({
-                        ...f,
-                        amount: result.amount != null ? String(result.amount) : f.amount,
-                        date: result.date || f.date,
-                        category: (result.category as import('../types').ExpenseCategory) || f.category,
-                        description: result.description || f.description,
-                      }));
-                    }
-                  } finally { setAnalyzing(false); }
-                }
+                    result = await api.analyzeReceipt(compressed.data, compressed.mimetype);
+                  } catch {
+                    result = await analyzeWithGemini(compressed.data, compressed.mimetype);
+                  }
+                  if (result && (result.description || result.amount != null)) {
+                    setReceiptForm(f => ({
+                      ...f,
+                      amount: result!.amount != null ? String(result!.amount) : f.amount,
+                      date: result!.date || f.date,
+                      category: (result!.category as import('../types').ExpenseCategory) || f.category,
+                      description: result!.description || f.description,
+                    }));
+                  }
+                } finally { setAnalyzing(false); }
               }}
             />
             <label className="form-label">Catégorie</label>

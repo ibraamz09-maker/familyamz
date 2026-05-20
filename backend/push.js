@@ -18,8 +18,8 @@ async function notifyFamily(familyId, excludeMemberId, title, body) {
     );
     const payload = JSON.stringify({ title, body });
     for (const sub of subs.rows) {
-      // Ne pas notifier l'émetteur
-      if (excludeMemberId && sub.member_id === excludeMemberId) continue;
+      // Ne pas notifier l'émetteur (Number() pour éviter le bug BigInt vs Number)
+      if (excludeMemberId && Number(sub.member_id) === Number(excludeMemberId)) continue;
       try {
         await webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
