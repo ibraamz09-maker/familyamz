@@ -58,7 +58,7 @@ export default function Login() {
     } finally { setLoading(false); }
   };
 
-  const MEMBERS = ['Foad', 'Ibrahim', 'Imen', 'Assia', 'Sabah'];
+  const MEMBERS = ['Papa', 'Ibrahim', 'Imen', 'Assia', 'Sabah'];
 
   return (
     <div className="login-page">
