@@ -4,12 +4,53 @@ const { db } = require('../db');
 const { authMiddleware } = require('../middleware/auth');
 const CATEGORIES = ['Loisirs', 'Vêtements', 'Abonnements', 'Électricité', 'Essence', 'Autres'];
 
-// Combinaisons modèle + version API à essayer dans l'ordre
+const PROMPT = (today) =>
+  `Analyse ce ticket de caisse ou cette facture. Catégories disponibles: ${CATEGORIES.join(', ')}. Date du jour si non trouvée: ${today}. Réponds UNIQUEMENT avec ce JSON sans markdown: {"amount": <montant total décimal ou null>, "date": "<YYYY-MM-DD>", "category": "<une des catégories>", "description": "<nom du magasin>"}`;
+
+function extractJSON(text) {
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  return JSON.parse(match[0]);
+}
+
+// ── Mistral (Pixtral) ────────────────────────────────────────────────────────
+async function analyzeWithMistral(base64Data, mimetype) {
+  const apiKey = (process.env.MISTRAL_API_KEY || '').trim();
+  if (!apiKey) return null;
+
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: 'pixtral-12b-2409',
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image_url', image_url: { url: `data:${mimetype};base64,${base64Data}` } },
+            { type: 'text', text: PROMPT(today) },
+          ],
+        }],
+        max_tokens: 300,
+      }),
+    });
+    const data = await response.json();
+    if (data.error) throw new Error(`Mistral: ${data.error.message}`);
+    const raw = (data.choices?.[0]?.message?.content || '').trim();
+    console.log('[Mistral] Réponse:', raw.slice(0, 200));
+    return extractJSON(raw);
+  } catch (e) {
+    console.error('[Mistral] Erreur:', e.message);
+    return null;
+  }
+}
+
+// ── Gemini (fallback) ────────────────────────────────────────────────────────
 const GEMINI_MODELS = [
   { model: 'gemini-1.5-flash-8b', version: 'v1beta' },
   { model: 'gemini-1.5-flash-8b', version: 'v1' },
   { model: 'gemini-1.5-flash',    version: 'v1' },
-  { model: 'gemini-1.5-flash-001', version: 'v1' },
   { model: 'gemini-2.0-flash-lite', version: 'v1beta' },
   { model: 'gemini-2.0-flash',    version: 'v1beta' },
 ];
@@ -28,61 +69,87 @@ async function callGemini(apiKey, model, version, parts) {
 
 async function analyzeWithGemini(base64Data, mimetype) {
   const apiKey = (process.env.GEMINI_API_KEY || '').trim();
-  if (!apiKey) { console.error('[Gemini] GEMINI_API_KEY non défini'); return null; }
+  if (!apiKey) return null;
 
   const today = new Date().toISOString().slice(0, 10);
-  const prompt = `Analyse ce ticket de caisse ou cette facture. Catégories disponibles: ${CATEGORIES.join(', ')}. Date du jour si non trouvée: ${today}. Réponds UNIQUEMENT avec ce JSON sans markdown: {"amount": <montant total décimal ou null>, "date": "<YYYY-MM-DD>", "category": "<une des catégories>", "description": "<nom du magasin>"}`;
   const parts = [
     { inline_data: { mime_type: mimetype, data: base64Data } },
-    { text: prompt },
+    { text: PROMPT(today) },
   ];
 
   for (const { model, version } of GEMINI_MODELS) {
     try {
       const data = await callGemini(apiKey, model, version, parts);
       const raw = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
-      console.log(`[Gemini] Réponse brute (${model} ${version}):`, raw.slice(0, 200));
-
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) { console.error(`[Gemini] Pas de JSON dans la réponse`); continue; }
-      const parsed = JSON.parse(jsonMatch[0]);
-      console.log(`[Gemini] Succès avec ${model}:`, parsed);
-      return parsed;
+      console.log(`[Gemini] Réponse (${model}):`, raw.slice(0, 200));
+      const parsed = extractJSON(raw);
+      if (parsed) return parsed;
     } catch (e) {
       console.error(`[Gemini] Échec ${model} (${version}):`, e.message);
-      // Clé invalide → inutile d'essayer les autres
       if (e.message.includes('API_KEY') || e.message.includes('401') || e.message.includes('403')) break;
-      // Quota ou modèle non dispo → essayer le suivant
-      continue;
     }
   }
   return null;
 }
 
-// Endpoint de diagnostic — test la connexion Gemini sans image
-router.get('/test-gemini', authMiddleware, async (req, res) => {
-  const apiKey = (process.env.GEMINI_API_KEY || '').trim();
-  if (!apiKey) return res.json({ ok: false, error: 'GEMINI_API_KEY non défini dans les variables Render' });
+// ── Analyse principale : Mistral en priorité, Gemini en fallback ─────────────
+async function analyzeReceipt(base64Data, mimetype) {
+  const result = await analyzeWithMistral(base64Data, mimetype);
+  if (result) { console.log('[IA] Succès via Mistral'); return result; }
+  const result2 = await analyzeWithGemini(base64Data, mimetype);
+  if (result2) { console.log('[IA] Succès via Gemini'); return result2; }
+  return null;
+}
 
+// ── Endpoint diagnostic ──────────────────────────────────────────────────────
+router.get('/test-gemini', authMiddleware, async (req, res) => {
+  const mistralKey = (process.env.MISTRAL_API_KEY || '').trim();
+  const geminiKey  = (process.env.GEMINI_API_KEY  || '').trim();
   const results = [];
-  for (const { model, version } of GEMINI_MODELS) {
+
+  // Test Mistral
+  if (mistralKey) {
     try {
-      const data = await callGemini(apiKey, model, version, [{ text: 'Réponds juste "ok"' }]);
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      results.push({ model, ok: true, response: text.slice(0, 50) });
-      break; // Premier modèle qui fonctionne = on s'arrête
+      const r = await fetch('https://api.mistral.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${mistralKey}` },
+        body: JSON.stringify({ model: 'pixtral-12b-2409', messages: [{ role: 'user', content: 'Réponds juste ok' }], max_tokens: 10 }),
+      });
+      const d = await r.json();
+      if (d.error) throw new Error(d.error.message);
+      results.push({ model: 'Mistral pixtral-12b', ok: true, response: d.choices?.[0]?.message?.content || '' });
     } catch (e) {
-      results.push({ model, ok: false, error: e.message });
+      results.push({ model: 'Mistral pixtral-12b', ok: false, error: e.message });
     }
+  } else {
+    results.push({ model: 'Mistral', ok: false, error: 'MISTRAL_API_KEY non défini' });
   }
-  res.json({ keyPrefix: apiKey.slice(0, 8) + '...', results });
+
+  // Test Gemini
+  if (geminiKey) {
+    for (const { model, version } of GEMINI_MODELS) {
+      try {
+        const data = await callGemini(geminiKey, model, version, [{ text: 'Réponds juste ok' }]);
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        results.push({ model: `Gemini ${model}`, ok: true, response: text.slice(0, 50) });
+        break;
+      } catch (e) {
+        results.push({ model: `Gemini ${model}`, ok: false, error: e.message });
+        if (e.message.includes('401') || e.message.includes('403')) break;
+      }
+    }
+  } else {
+    results.push({ model: 'Gemini', ok: false, error: 'GEMINI_API_KEY non défini' });
+  }
+
+  res.json({ results });
 });
 
 router.post('/analyze', authMiddleware, async (req, res) => {
   try {
     const { data, mimetype } = req.body;
     if (!data || !mimetype) return res.status(400).json({ error: 'Image manquante' });
-    const result = await analyzeWithGemini(data, mimetype);
+    const result = await analyzeReceipt(data, mimetype);
     if (!result) return res.json({ amount: null, date: new Date().toISOString().slice(0, 10), category: 'Autres', description: '' });
     res.json(result);
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -101,10 +168,7 @@ router.get('/', authMiddleware, async (req, res) => {
       sql += ` AND strftime('%Y', date) = ?`;
       args.push(year);
     }
-    if (category) {
-      sql += ` AND category = ?`;
-      args.push(category);
-    }
+    if (category) { sql += ` AND category = ?`; args.push(category); }
     sql += ' ORDER BY date DESC, created_at DESC';
     const result = await db.execute({ sql, args });
     res.json(result.rows);
@@ -131,10 +195,7 @@ router.post('/', authMiddleware, async (req, res) => {
     if (!filename || !mimetype || !data || !date || !category) {
       return res.status(400).json({ error: 'Champs manquants' });
     }
-
     let expenseId = null;
-
-    // Si un montant est fourni, créer automatiquement une dépense
     if (amount && parseFloat(amount) > 0) {
       const desc = description ? `📎 ${description}` : `📎 Ticket`;
       const expResult = await db.execute({
@@ -143,10 +204,8 @@ router.post('/', authMiddleware, async (req, res) => {
       });
       expenseId = Number(expResult.lastInsertRowid);
     }
-
     const result = await db.execute({
-      sql: `INSERT INTO receipts (family_id, filename, mimetype, data, amount, date, category, description, member_id, expense_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO receipts (family_id, filename, mimetype, data, amount, date, category, description, member_id, expense_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [req.user.familyId, filename, mimetype, data, amount || null, date, category, description || '', member_id || null, expenseId]
     });
     res.json({ id: Number(result.lastInsertRowid), expense_id: expenseId });
@@ -155,7 +214,6 @@ router.post('/', authMiddleware, async (req, res) => {
 
 router.delete('/:id', authMiddleware, async (req, res) => {
   try {
-    // Supprimer la dépense liée si elle existe
     const rec = await db.execute({
       sql: 'SELECT expense_id FROM receipts WHERE id = ? AND family_id = ?',
       args: [req.params.id, req.user.familyId]
