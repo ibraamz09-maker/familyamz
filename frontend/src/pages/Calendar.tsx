@@ -366,36 +366,45 @@ export default function Calendar() {
             <input className="input" type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} />
             <label className="form-label">Qui est concerné ?</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-              <button
-                type="button"
-                onClick={() => setForm(f => ({ ...f, member_ids: [] }))}
-                style={{
-                  padding: '8px 16px', borderRadius: 20, fontWeight: 700, fontSize: 14, cursor: 'pointer',
-                  border: `2px solid ${form.member_ids.length === 0 ? '#6B7280' : 'var(--border)'}`,
-                  background: form.member_ids.length === 0 ? '#6B7280' : 'var(--surface)',
-                  color: form.member_ids.length === 0 ? 'white' : 'var(--text)',
-                }}
-              >
-                👨‍👩‍👧‍👦 Tous
-              </button>
-              {members.map(m => {
-                const sel = form.member_ids.map(Number).includes(Number(m.id));
+              {(() => {
+                const allIds = members.map(m => Number(m.id));
+                const selIds = form.member_ids.map(Number);
+                const allLit = allIds.length > 0 && allIds.every(id => selIds.includes(id));
                 return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => toggleMember(m.id)}
-                    style={{
-                      padding: '8px 16px', borderRadius: 20, fontWeight: 700, fontSize: 14, cursor: 'pointer',
-                      border: `2px solid ${sel ? m.color : 'var(--border)'}`,
-                      background: sel ? m.color : 'var(--surface)',
-                      color: sel ? 'white' : 'var(--text)',
-                    }}
-                  >
-                    {m.name}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, member_ids: allLit ? [] : allIds }))}
+                      style={{
+                        padding: '8px 16px', borderRadius: 20, fontWeight: 700, fontSize: 14, cursor: 'pointer',
+                        border: `2px solid ${allLit || selIds.length === 0 ? '#6B7280' : 'var(--border)'}`,
+                        background: allLit || selIds.length === 0 ? '#6B7280' : 'var(--surface)',
+                        color: allLit || selIds.length === 0 ? 'white' : 'var(--text)',
+                      }}
+                    >
+                      👨‍👩‍👧‍👦 Tous
+                    </button>
+                    {members.map(m => {
+                      const sel = selIds.includes(Number(m.id));
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => toggleMember(m.id)}
+                          style={{
+                            padding: '8px 16px', borderRadius: 20, fontWeight: 700, fontSize: 14, cursor: 'pointer',
+                            border: `2px solid ${sel ? m.color : 'var(--border)'}`,
+                            background: sel ? m.color : 'var(--surface)',
+                            color: sel ? 'white' : 'var(--text)',
+                          }}
+                        >
+                          {m.name}
+                        </button>
+                      );
+                    })}
+                  </>
                 );
-              })}
+              })()}
             </div>
             <label className="form-label">Description (optionnel)</label>
             <textarea className="textarea" placeholder="Lieu, détails..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
