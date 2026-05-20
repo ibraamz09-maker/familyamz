@@ -39,11 +39,15 @@ export default function Calendar() {
   const [viewDate, setViewDate] = useState(new Date(today));
   const [weekEvents, setWeekEvents] = useState<CalendarEvent[]>([]);
 
+  // Charger les membres séparément (indépendamment des events)
+  useEffect(() => {
+    api.getMembers().then(mbrs => setMembers(mbrs as Member[])).catch(() => {});
+  }, []);
+
   const fetchMonthData = useCallback(async () => {
     try {
-      const [evts, mbrs] = await Promise.all([api.getEvents(year, month + 1), api.getMembers()]);
+      const evts = await api.getEvents(year, month + 1);
       setEvents(evts as CalendarEvent[]);
-      setMembers(mbrs as Member[]);
     } catch { /* ignore */ }
   }, [year, month]);
 
@@ -152,6 +156,12 @@ export default function Calendar() {
     if (ev.member_name) return ev.member_name;
     return 'Toute la famille';
   };
+
+  // Variables pour le sélecteur de membres (calculées à chaque render)
+  const allMemberIds = members.map(m => Number(m.id));
+  const selectedIds = form.member_ids.map(Number);
+  const allAreSelected = allMemberIds.length > 0 && allMemberIds.every(id => selectedIds.includes(id));
+  const tousActive = selectedIds.length === 0 || allAreSelected;
 
   // Day view
   const viewDateStr = dateToStr(viewDate);
@@ -366,45 +376,39 @@ export default function Calendar() {
             <input className="input" type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} />
             <label className="form-label">Qui est concerné ?</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-              {(() => {
-                const allIds = members.map(m => Number(m.id));
-                const selIds = form.member_ids.map(Number);
-                const allLit = allIds.length > 0 && allIds.every(id => selIds.includes(id));
+              <button
+                type="button"
+                onClick={() => setForm(f => ({ ...f, member_ids: allAreSelected ? [] : [...allMemberIds] }))}
+                style={{
+                  padding: '8px 16px', borderRadius: 20, fontWeight: 700, fontSize: 14, cursor: 'pointer',
+                  border: '2px solid #6B7280',
+                  background: tousActive ? '#6B7280' : 'var(--surface)',
+                  color: tousActive ? 'white' : 'var(--text)',
+                }}
+              >
+                👨‍👩‍👧‍👦 Tous
+              </button>
+              {members.map(m => {
+                const isSelected = selectedIds.includes(Number(m.id));
                 return (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setForm(f => ({ ...f, member_ids: allLit ? [] : allIds }))}
-                      style={{
-                        padding: '8px 16px', borderRadius: 20, fontWeight: 700, fontSize: 14, cursor: 'pointer',
-                        border: `2px solid ${allLit || selIds.length === 0 ? '#6B7280' : 'var(--border)'}`,
-                        background: allLit || selIds.length === 0 ? '#6B7280' : 'var(--surface)',
-                        color: allLit || selIds.length === 0 ? 'white' : 'var(--text)',
-                      }}
-                    >
-                      👨‍👩‍👧‍👦 Tous
-                    </button>
-                    {members.map(m => {
-                      const sel = selIds.includes(Number(m.id));
-                      return (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => toggleMember(m.id)}
-                          style={{
-                            padding: '8px 16px', borderRadius: 20, fontWeight: 700, fontSize: 14, cursor: 'pointer',
-                            border: `2px solid ${sel ? m.color : 'var(--border)'}`,
-                            background: sel ? m.color : 'var(--surface)',
-                            color: sel ? 'white' : 'var(--text)',
-                          }}
-                        >
-                          {m.name}
-                        </button>
-                      );
-                    })}
-                  </>
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => toggleMember(m.id)}
+                    style={{
+                      padding: '8px 16px', borderRadius: 20, fontWeight: 700, fontSize: 14, cursor: 'pointer',
+                      border: `2px solid ${isSelected ? m.color : 'var(--border)'}`,
+                      background: isSelected ? m.color : 'var(--surface)',
+                      color: isSelected ? 'white' : 'var(--text)',
+                    }}
+                  >
+                    {m.name}
+                  </button>
                 );
-              })()}
+              })}
+              {members.length === 0 && (
+                <span style={{ fontSize: 13, color: 'var(--text-2)', paddingTop: 8 }}>Chargement des membres...</span>
+              )}
             </div>
             <label className="form-label">Description (optionnel)</label>
             <textarea className="textarea" placeholder="Lieu, détails..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
