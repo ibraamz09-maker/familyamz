@@ -459,6 +459,23 @@ export default function Expenses() {
                 created_at: new Date().toISOString(),
               };
               setReceipts(prev => [newReceipt, ...prev]);
+
+              // Si un montant est saisi → ajouter immédiatement dans les dépenses (optimiste)
+              const parsedAmount = receiptForm.amount ? parseFloat(receiptForm.amount.replace(',', '.')) : null;
+              if (parsedAmount && parsedAmount > 0) {
+                const optimisticExpense: Expense = {
+                  id: Date.now(),
+                  family_id: 0,
+                  member_id: receiptForm.member_id ? Number(receiptForm.member_id) : null,
+                  amount: parsedAmount,
+                  date: receiptForm.date,
+                  category: receiptForm.category,
+                  description: receiptForm.description ? `📎 ${receiptForm.description}` : '📎 Ticket',
+                  members_info: [],
+                };
+                setExpenses(prev => [optimisticExpense, ...prev]);
+              }
+
               setShowReceiptModal(false);
               setReceiptPreview(null);
               setReceiptForm({ filename: '', mimetype: '', data: '', amount: '', date: today.toISOString().slice(0, 10), category: EXPENSE_CATEGORIES[0], description: '', member_id: '' });
@@ -470,6 +487,8 @@ export default function Expenses() {
                   try { localStorage.setItem(RECEIPTS_CACHE_KEY, JSON.stringify(list.map(r => ({ ...r, data: '' })))); } catch { /* quota */ }
                 }
               }).catch(() => {});
+              // Sync dépenses en arrière-plan
+              fetchData().catch(() => {});
             } catch (err) {
               alert('❌ Erreur de sauvegarde : ' + (err instanceof Error ? err.message : 'Vérifiez la connexion'));
             } finally { setLoading(false); }
