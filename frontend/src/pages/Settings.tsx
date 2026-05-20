@@ -42,6 +42,14 @@ export default function Settings() {
   );
   const [notifPerm, setNotifPerm] = useState<NotificationPermission | 'unsupported'>('default');
   const [notifLoading, setNotifLoading] = useState(false);
+  const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem('familyamz_gemini_key') || '');
+  const [geminiSaved, setGeminiSaved] = useState(false);
+
+  const saveGeminiKey = () => {
+    localStorage.setItem('familyamz_gemini_key', geminiKey.trim());
+    setGeminiSaved(true);
+    setTimeout(() => setGeminiSaved(false), 2000);
+  };
 
   useEffect(() => {
     if (!('Notification' in window)) {
@@ -202,6 +210,40 @@ export default function Settings() {
           <div style={{ fontSize: 13, color: 'var(--danger)', background: '#FEE2E2', padding: '10px 12px', borderRadius: 8 }}>
             Les notifications ont été refusées. Pour les réactiver :<br />
             <strong>Réglages iPhone → Safari → {family?.name || 'ce site'} → Notifications → Autoriser</strong>
+          </div>
+        )}
+      </div>
+
+      {/* Clé Gemini */}
+      <p className="section-title">Analyse automatique des tickets</p>
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 10 }}>
+          🤖 Clé API Gemini pour l'analyse automatique des tickets de caisse.
+          Obtiens-la sur <strong>aistudio.google.com</strong> → "Get API key" (gratuit)
+        </div>
+        <input
+          className="input"
+          type="password"
+          placeholder="AIza... (colle ta clé ici)"
+          value={geminiKey}
+          onChange={e => setGeminiKey(e.target.value)}
+          style={{ marginBottom: 8 }}
+        />
+        <button
+          className="btn-primary"
+          onClick={saveGeminiKey}
+          style={{ width: '100%', padding: '12px' }}
+        >
+          {geminiSaved ? '✅ Sauvegardé !' : '💾 Enregistrer la clé'}
+        </button>
+        {geminiKey && !geminiSaved && (
+          <div style={{ fontSize: 12, color: 'var(--success, #16a34a)', marginTop: 8 }}>
+            ✅ Clé configurée — l'analyse automatique est active
+          </div>
+        )}
+        {!geminiKey && (
+          <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 8 }}>
+            Sans clé, tu peux quand même remplir les tickets manuellement.
           </div>
         )}
       </div>

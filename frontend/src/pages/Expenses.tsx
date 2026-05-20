@@ -8,6 +8,33 @@ import Modal from '../components/Modal';
 
 function fmt(n: number) { return n.toFixed(2).replace('.', ',') + ' €'; }
 
+async function analyzeWithGemini(imageData: string, mimetype: string): Promise<{ amount: number | null; date: string; category: string; description: string } | null> {
+  const apiKey = localStorage.getItem('familyamz_gemini_key')?.trim();
+  if (!apiKey) return null;
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [
+            { inline_data: { mime_type: mimetype, data: imageData } },
+            { text: 'Analyse ce ticket de caisse. Réponds UNIQUEMENT avec ce JSON sans markdown:\n{"amount": <montant total décimal ou null>, "date": "<YYYY-MM-DD>", "category": "<Loisirs|Vêtements|Abonnements|Électricité|Essence|Autres>", "description": "<nom du magasin>"}' },
+          ]}],
+        }),
+      }
+    );
+    const data = await response.json();
+    if (data.error) throw new Error(data.error.message);
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+    const cleaned = text.replace(/```json\n?|\n?```/g, '').trim();
+    return JSON.parse(cleaned);
+  } catch {
+    return null;
+  }
+}
+
 function compressImage(file: File): Promise<{ data: string; mimetype: string; filename: string }> {
   return new Promise((resolve) => {
     if (!file.type.startsWith('image/')) {
@@ -61,6 +88,7 @@ export default function Expenses() {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [receiptForm, setReceiptForm] = useState({
@@ -298,12 +326,19 @@ export default function Expenses() {
           {receipts.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">🧾</div>
-              <p>Aucun ticket ce mois-ci</p>
+              <p>Aucun ticket stocké</p>
             </div>
           ) : (
             receipts.map(r => (
               <div key={r.id} className="receipt-item">
-                <div className="receipt-thumb">{r.mimetype.startsWith('image/') ? '🖼️' : '📄'}</div>
+                <button
+                  className="receipt-thumb"
+                  style={{ background: 'none', border: 'none', cursor: r.mimetype.startsWith('image/') ? 'pointer' : 'default', fontSize: 28, padding: 0 }}
+                  onClick={() => r.mimetype.startsWith('image/') && setPreviewUrl(api.getReceiptFileUrl(r.id))}
+                  title={r.mimetype.startsWith('image/') ? 'Voir le ticket' : ''}
+                >
+                  {r.mimetype.startsWith('image/') ? '🖼️' : '📄'}
+                </button>
                 <div className="receipt-info">
                   <div className="receipt-name">{r.description || r.filename}</div>
                   <div className="receipt-meta">{r.date} · {r.category}{r.amount != null ? ` · ${fmt(r.amount)}` : ''}</div>
@@ -389,21 +424,23 @@ export default function Expenses() {
                 setReceiptForm(f => ({ ...f, ...compressed }));
                 if (compressed.mimetype.startsWith('image/')) setReceiptPreview(`data:${compressed.mimetype};base64,${compressed.data}`);
                 else setReceiptPreview(null);
-                // Analyse automatique avec Gemini (si disponible)
-                setAnalyzing(true);
-                try {
-                  const result = await api.analyzeReceipt(compressed.data, compressed.mimetype);
-                  if (result.description || result.amount != null) {
-                    setReceiptForm(f => ({
-                      ...f,
-                      amount: result.amount != null ? String(result.amount) : f.amount,
-                      date: result.date || f.date,
-                      category: (result.category as import('../types').ExpenseCategory) || f.category,
-                      description: result.description || f.description,
-                    }));
-                  }
-                } catch { /* Gemini non disponible, l'utilisateur remplit manuellement */ }
-                finally { setAnalyzing(false); }
+                // Analyse automatique avec Gemini (directement depuis le navigateur)
+                const hasKey = !!localStorage.getItem('familyamz_gemini_key')?.trim();
+                if (hasKey) {
+                  setAnalyzing(true);
+                  try {
+                    const result = await analyzeWithGemini(compressed.data, compressed.mimetype);
+                    if (result && (result.description || result.amount != null)) {
+                      setReceiptForm(f => ({
+                        ...f,
+                        amount: result.amount != null ? String(result.amount) : f.amount,
+                        date: result.date || f.date,
+                        category: (result.category as import('../types').ExpenseCategory) || f.category,
+                        description: result.description || f.description,
+                      }));
+                    }
+                  } finally { setAnalyzing(false); }
+                }
               }}
             />
             <label className="form-label">Catégorie</label>
@@ -426,6 +463,27 @@ export default function Expenses() {
             </button>
           </form>
         </Modal>
+      )}
+
+      {/* Modal aperçu image ticket */}
+      {previewUrl && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onClick={() => setPreviewUrl(null)}
+        >
+          <img
+            src={previewUrl}
+            alt="ticket"
+            style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}
+            onClick={e => e.stopPropagation()}
+          />
+          <button
+            style={{ marginTop: 16, background: 'white', border: 'none', borderRadius: 24, padding: '10px 28px', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}
+            onClick={() => setPreviewUrl(null)}
+          >
+            Fermer
+          </button>
+        </div>
       )}
 
       {showModal && (
