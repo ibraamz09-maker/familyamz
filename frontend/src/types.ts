@@ -36,6 +36,7 @@ export interface Message {
   member_name: string;
   member_color: string;
   text: string;
+  audio?: string;
   created_at: string;
 }
 
@@ -48,6 +49,8 @@ export interface CalendarEvent {
   date: string;
   time?: string;
   description: string;
+  urgent?: number;
+  recurrence?: string;
   member_name?: string;
   member_color?: string;
   members_info?: { id: number; name: string; color: string }[];

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { db } = require('../db');
 const { authMiddleware } = require('../middleware/auth');
+const { notifyFamily } = require('../push');
 
 router.get('/', authMiddleware, async (req, res) => {
   try {
@@ -31,6 +32,12 @@ router.post('/', authMiddleware, async (req, res) => {
       'INSERT INTO expenses (family_id, member_id, amount, date, category, description) VALUES (?, ?, ?, ?, ?, ?)',
       [req.user.familyId, member_id || null, amount, date, category, description || '']
     );
+    const senderName = req.user.memberName || 'Famille';
+    notifyFamily(
+      req.user.familyId, req.user.memberId,
+      '💶 Nouvelle dépense',
+      `${senderName} a ajouté ${parseFloat(amount).toFixed(2)}€ (${category})`
+    ).catch(() => {});
     res.json({ id: Number(result.lastInsertRowid) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

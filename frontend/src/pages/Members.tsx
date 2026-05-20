@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { api } from '../api';
 import { Member, PRESET_COLORS } from '../types';
 import Modal from '../components/Modal';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Members() {
+  const { member: currentMember } = useAuth();
   const [members, setMembers] = useState<Member[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
@@ -87,13 +89,23 @@ export default function Members() {
               {initials(m.name)}
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700 }}>{m.name}</div>
+              <div style={{ fontWeight: 700 }}>
+                {m.name}
+                {currentMember && Number(currentMember.id) === Number(m.id) && (
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)', padding: '1px 8px', borderRadius: 20, marginLeft: 8 }}>Moi</span>
+                )}
+              </div>
               {lastSeenLabel && <div style={{ fontSize: 12, color: 'var(--text-2)' }}>{lastSeenLabel}</div>}
             </div>
-            <div className="member-actions">
-              <button className="btn-icon" onClick={() => openEdit(m)}>✏️</button>
-              <button className="btn-icon" onClick={() => handleDelete(m.id, m.name)}>🗑️</button>
-            </div>
+            {/* Boutons visibles uniquement pour son propre profil ou si pas de membre connecté */}
+            {(!currentMember || Number(currentMember.id) === Number(m.id)) && (
+              <div className="member-actions">
+                <button className="btn-icon" onClick={() => openEdit(m)}>✏️</button>
+                {!currentMember && (
+                  <button className="btn-icon" onClick={() => handleDelete(m.id, m.name)}>🗑️</button>
+                )}
+              </div>
+            )}
           </div>
         );
       })}

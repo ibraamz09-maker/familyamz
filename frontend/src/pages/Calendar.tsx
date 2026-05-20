@@ -32,7 +32,7 @@ export default function Calendar() {
   const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [detailEvent, setDetailEvent] = useState<CalendarEvent | null>(null);
-  const [form, setForm] = useState({ title: '', description: '', member_ids: [] as number[], time: '' });
+  const [form, setForm] = useState({ title: '', description: '', member_ids: [] as number[], time: '', urgent: false, recurrence: 'none' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [calView, setCalView] = useState<'day' | 'week'>('day');
@@ -79,7 +79,7 @@ export default function Calendar() {
     setEditingEvent(null);
     setDetailEvent(null);
     setError('');
-    setForm({ title: '', description: '', member_ids: [], time: '' });
+    setForm({ title: '', description: '', member_ids: [], time: '', urgent: false, recurrence: 'none' });
     setShowModal(true);
   };
 
@@ -89,7 +89,7 @@ export default function Calendar() {
     setError('');
     let ids: number[] = [];
     try { if (ev.member_ids) ids = JSON.parse(ev.member_ids); } catch {}
-    setForm({ title: ev.title, description: ev.description, member_ids: ids, time: ev.time || '' });
+    setForm({ title: ev.title, description: ev.description, member_ids: ids, time: ev.time || '', urgent: !!(ev.urgent), recurrence: ev.recurrence || 'none' });
   };
 
   const toggleMember = (id: number) => {
@@ -115,14 +115,23 @@ export default function Calendar() {
         member_ids: form.member_ids,
         date: editingEvent ? editingEvent.date : toDateStr(year, month, selectedDay!),
         time: form.time || '',
+        urgent: form.urgent,
+        recurrence: form.recurrence,
       };
-      if (editingEvent) await api.updateEvent(editingEvent.id, data);
-      else await api.createEvent(data);
-      await fetchMonthData();
-      await fetchWeekData();
-      setForm({ title: '', description: '', member_ids: [], time: '' });
-      setEditingEvent(null);
-      setShowModal(false);
+      if (editingEvent) {
+        await api.updateEvent(editingEvent.id, data);
+        await fetchMonthData();
+        await fetchWeekData();
+        setEditingEvent(null);
+        setShowModal(false);
+      } else {
+        await api.createEvent(data);
+        await fetchMonthData();
+        await fetchWeekData();
+        // Garder le modal ouvert pour voir l'événement ajouté
+        setForm({ title: '', description: '', member_ids: [], time: '', urgent: false, recurrence: 'none' });
+        setEditingEvent(null);
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erreur lors de l\'enregistrement');
     } finally { setLoading(false); }
@@ -205,8 +214,8 @@ export default function Calendar() {
             <div style={{ marginBottom: 8 }}>
               <div className="cal-time-label" style={{ fontWeight: 700, color: 'var(--text-2)', fontSize: 12 }}>TOUTE LA JOURNÉE</div>
               {allDayEvts.map(ev => (
-                <div key={ev.id} className="cal-day-event" style={{ borderLeftColor: ev.member_color || '#9CA3AF', cursor: 'pointer' }} onClick={() => setDetailEvent(ev)}>
-                  <span className="cal-event-title">{ev.title}</span>
+                <div key={ev.id} className="cal-day-event" style={{ borderLeftColor: ev.urgent ? '#EF4444' : (ev.member_color || '#9CA3AF'), cursor: 'pointer' }} onClick={() => setDetailEvent(ev)}>
+                  <span className="cal-event-title">{ev.urgent ? '🚨 ' : ''}{ev.title}</span>
                   <span className="cal-event-member"> · {getMembersLabel(ev)}</span>
                 </div>
               ))}
@@ -221,9 +230,9 @@ export default function Calendar() {
                 <div className="cal-time-label">{pad(h)}h</div>
                 <div className="cal-hour-content">
                   {slotEvts.map(ev => (
-                    <div key={ev.id} className="cal-day-event" style={{ borderLeftColor: ev.member_color || '#9CA3AF', cursor: 'pointer' }} onClick={() => setDetailEvent(ev)}>
+                    <div key={ev.id} className="cal-day-event" style={{ borderLeftColor: ev.urgent ? '#EF4444' : (ev.member_color || '#9CA3AF'), cursor: 'pointer' }} onClick={() => setDetailEvent(ev)}>
                       <span className="cal-event-time">{ev.time}</span>
-                      <span className="cal-event-title"> {ev.title}</span>
+                      <span className="cal-event-title"> {ev.urgent ? '🚨 ' : ''}{ev.title}</span>
                       <span className="cal-event-member"> · {getMembersLabel(ev)}</span>
                     </div>
                   ))}
@@ -331,10 +340,11 @@ export default function Calendar() {
           {!editingEvent && (
             <div className="event-list">
               {eventsForDayNum(selectedDay).map(ev => (
-                <div key={ev.id} className="event-item" style={{ borderLeftColor: ev.member_color || '#9CA3AF', cursor: 'pointer' }} onClick={() => setDetailEvent(ev)}>
+                <div key={ev.id} className="event-item" style={{ borderLeftColor: ev.urgent ? '#EF4444' : (ev.member_color || '#9CA3AF'), cursor: 'pointer' }} onClick={() => setDetailEvent(ev)}>
                   <div className="event-item-content">
                     {ev.time && <span className="event-time-badge">{ev.time}</span>}
-                    <strong>{ev.title}</strong>
+                    {ev.urgent ? <strong>🚨 {ev.title}</strong> : <strong>{ev.title}</strong>}
+                    {ev.recurrence && ev.recurrence !== 'none' && <span className="recurrence-badge">🔁 {ev.recurrence === 'weekly' ? 'Hebdo' : 'Mensuel'}</span>}
                     <span className="event-member"> · {getMembersLabel(ev)}</span>
                     {ev.description && <p className="event-desc">{ev.description}</p>}
                   </div>
@@ -397,12 +407,36 @@ export default function Calendar() {
             </div>
             <label className="form-label">Description (optionnel)</label>
             <textarea className="textarea" placeholder="Lieu, détails..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+
+            <label className="form-label">Récurrence</label>
+            <select className="select" value={form.recurrence} onChange={e => setForm(f => ({ ...f, recurrence: e.target.value }))}>
+              <option value="none">Aucune</option>
+              <option value="weekly">Toutes les semaines (12 semaines)</option>
+              <option value="monthly">Tous les mois (6 mois)</option>
+            </select>
+
+            <div
+              onClick={() => setForm(f => ({ ...f, urgent: !f.urgent }))}
+              style={{
+                padding: '12px 16px', borderRadius: 12, cursor: 'pointer', marginBottom: 14,
+                border: `2px solid ${form.urgent ? '#EF4444' : 'var(--border)'}`,
+                background: form.urgent ? '#FEE2E2' : 'var(--surface)',
+                display: 'flex', alignItems: 'center', gap: 12, userSelect: 'none',
+              }}
+            >
+              <span style={{ fontSize: 22 }}>{form.urgent ? '🚨' : '⚡'}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 15, color: form.urgent ? '#EF4444' : 'var(--text)' }}>Urgent</div>
+                <div style={{ fontSize: 12, color: 'var(--text-2)' }}>Notification immédiate envoyée à tous</div>
+              </div>
+              <span style={{ fontSize: 20 }}>{form.urgent ? '☑️' : '⬜'}</span>
+            </div>
             <div className="modal-submit-sticky">
               <button className="btn-primary" onClick={handleSubmit} disabled={loading || !form.title.trim()} style={{ width: '100%' }}>
                 {loading ? 'Enregistrement...' : editingEvent ? '✓ Modifier' : '✓ Ajouter'}
               </button>
               {editingEvent && (
-                <button className="btn-secondary" style={{ width: '100%', marginTop: 8 }} onClick={() => { setEditingEvent(null); setForm({ title: '', description: '', member_ids: [], time: '' }); }}>
+                <button className="btn-secondary" style={{ width: '100%', marginTop: 8 }} onClick={() => { setEditingEvent(null); setForm({ title: '', description: '', member_ids: [], time: '', urgent: false, recurrence: 'none' }); }}>
                   Annuler
                 </button>
               )}

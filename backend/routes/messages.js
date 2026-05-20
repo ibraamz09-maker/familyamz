@@ -31,17 +31,18 @@ router.delete('/ephemeral/:days', authMiddleware, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST send message
+// POST send message (text ou audio)
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { text } = req.body;
-    if (!text || !text.trim()) return res.status(400).json({ error: 'Message vide' });
+    const { text, audio } = req.body;
+    if (!text && !audio) return res.status(400).json({ error: 'Message vide' });
     const memberName = req.user.memberName || req.user.name || 'Famille';
     const memberColor = req.user.memberColor || '#9CA3AF';
     const memberId = req.user.memberId || null;
+    const msgText = (text || '').trim();
     const r = await db.execute(
-      'INSERT INTO messages (family_id, member_id, member_name, member_color, text) VALUES (?, ?, ?, ?, ?)',
-      [req.user.familyId, memberId, memberName, memberColor, text.trim()]
+      'INSERT INTO messages (family_id, member_id, member_name, member_color, text, audio) VALUES (?, ?, ?, ?, ?, ?)',
+      [req.user.familyId, memberId, memberName, memberColor, msgText, audio || '']
     );
     const msg = {
       id: Number(r.lastInsertRowid),
@@ -49,12 +50,14 @@ router.post('/', authMiddleware, async (req, res) => {
       member_id: memberId,
       member_name: memberName,
       member_color: memberColor,
-      text: text.trim(),
+      text: msgText,
+      audio: audio || '',
       created_at: new Date().toISOString(),
     };
     res.json(msg);
-    // Notification push aux autres membres (sans await pour ne pas bloquer)
-    notifyFamily(req.user.familyId, memberId, `💬 ${memberName}`, text.trim()).catch(() => {});
+    // Notification push aux autres membres
+    const notifText = audio ? '🎤 Message vocal' : msgText;
+    notifyFamily(req.user.familyId, memberId, `💬 ${memberName}`, notifText).catch(() => {});
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

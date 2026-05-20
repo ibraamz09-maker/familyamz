@@ -1,4 +1,4 @@
-type Tab = 'calendar' | 'tasks' | 'expenses' | 'messages' | 'map' | 'members';
+type Tab = 'calendar' | 'tasks' | 'expenses' | 'messages' | 'map' | 'members' | 'settings';
 
 interface Props {
   activeTab: Tab;
@@ -12,6 +12,7 @@ const tabs: { id: Tab; icon: string; label: string }[] = [
   { id: 'messages', icon: '💬', label: 'Chat' },
   { id: 'map', icon: '🗺️', label: 'Carte' },
   { id: 'members', icon: '👥', label: 'Membres' },
+  { id: 'settings', icon: '⚙️', label: 'Réglages' },
 ];
 
 export default function BottomNav({ activeTab, setActiveTab }: Props) {
@@ -23,8 +24,8 @@ export default function BottomNav({ activeTab, setActiveTab }: Props) {
           className={`bottom-nav-item ${activeTab === t.id ? 'active' : ''}`}
           onClick={() => setActiveTab(t.id)}
         >
-          <span className="bottom-nav-icon">{t.icon}</span>
-          <span className="bottom-nav-label">{t.label}</span>
+          <span className="bottom-nav-icon" style={{ fontSize: 18 }}>{t.icon}</span>
+          <span className="bottom-nav-label" style={{ fontSize: 9 }}>{t.label}</span>
         </button>
       ))}
     </nav>

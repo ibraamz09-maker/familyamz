@@ -1163,3 +1163,180 @@ html, body {
   flex: 1;
   font-size: 15px;
 }
+
+/* ==================== THEMES ==================== */
+html[data-theme="dark"] {
+  --primary: #818CF8;
+  --primary-dark: #6366F1;
+  --primary-light: rgba(129,140,248,0.15);
+  --bg: #111827;
+  --surface: #1F2937;
+  --border: #374151;
+  --text: #F9FAFB;
+  --text-2: #9CA3AF;
+  --danger: #F87171;
+  --success: #34D399;
+  --shadow: 0 1px 4px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.6);
+}
+
+html[data-theme="rose"] {
+  --primary: #EC4899;
+  --primary-dark: #DB2777;
+  --primary-light: #FDF2F8;
+  --bg: #FFF1F5;
+  --surface: #FFFFFF;
+  --border: #FBCFE8;
+  --text: #1C1C1E;
+  --text-2: #9D174D;
+  --shadow: 0 1px 4px rgba(236,72,153,0.1);
+  --shadow-lg: 0 8px 24px rgba(236,72,153,0.15);
+}
+
+html[data-theme="blue"] {
+  --primary: #0EA5E9;
+  --primary-dark: #0284C7;
+  --primary-light: #E0F2FE;
+  --bg: #F0F9FF;
+  --surface: #FFFFFF;
+  --border: #BAE6FD;
+  --text: #0C4A6E;
+  --text-2: #0369A1;
+  --shadow: 0 1px 4px rgba(14,165,233,0.1);
+  --shadow-lg: 0 8px 24px rgba(14,165,233,0.15);
+}
+
+html[data-font="small"] { font-size: 14px; }
+html[data-font="large"] { font-size: 18px; }
+
+/* ==================== SETTINGS ==================== */
+.settings-profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+  margin-bottom: 20px;
+}
+.settings-avatar {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-weight: 800; font-size: 22px;
+  flex-shrink: 0;
+}
+.theme-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.theme-btn {
+  padding: 14px 12px;
+  border-radius: 12px;
+  border: 2.5px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  display: flex; align-items: center; gap: 10px;
+  font-weight: 600; font-size: 15px;
+  color: var(--text);
+  transition: all 0.15s;
+}
+.theme-btn.selected { border-color: var(--primary); background: var(--primary-light); }
+.font-row { display: flex; gap: 8px; }
+.font-btn {
+  flex: 1; padding: 12px 8px;
+  border-radius: 10px;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.font-btn.selected { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
+
+/* Urgent badge */
+.urgent-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #FEE2E2;
+  color: #EF4444;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  margin-left: 6px;
+}
+
+/* Recurrence badge */
+.recurrence-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: var(--primary-light);
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  margin-left: 4px;
+}
+
+/* Voice message */
+.voice-bubble {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 140px;
+}
+.voice-play-btn {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.25);
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.voice-play-btn.other-voice {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+.voice-waveform {
+  flex: 1;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.voice-bar {
+  width: 3px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.5);
+}
+.voice-bar.other-bar {
+  background: var(--primary);
+  opacity: 0.6;
+}
+.record-btn {
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bg);
+  color: var(--text-2);
+  font-size: 20px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.record-btn.recording {
+  background: #FEE2E2;
+  color: var(--danger);
+  animation: pulse 1s infinite;
+}
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}

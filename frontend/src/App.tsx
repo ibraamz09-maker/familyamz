@@ -9,10 +9,11 @@ import Expenses from './pages/Expenses';
 import Members from './pages/Members';
 import Messages from './pages/Messages';
 import MapPage from './pages/Map';
+import Settings, { applyTheme, applyFontSize } from './pages/Settings';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 
-type Tab = 'calendar' | 'tasks' | 'expenses' | 'messages' | 'map' | 'members';
+type Tab = 'calendar' | 'tasks' | 'expenses' | 'messages' | 'map' | 'members' | 'settings';
 
 const TAB_TITLES: Record<Tab, string> = {
   calendar: 'Calendrier',
@@ -21,11 +22,20 @@ const TAB_TITLES: Record<Tab, string> = {
   messages: 'Messages',
   map: 'Carte famille',
   members: 'Membres',
+  settings: 'Réglages',
 };
 
 export default function App() {
   const { family, isAdmin, member } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('calendar');
+
+  // Appliquer le thème et la taille de police sauvegardés
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('familyamz_theme') as 'light' | 'dark' | 'rose' | 'blue' | null;
+    const savedFont = localStorage.getItem('familyamz_font') as 'small' | 'medium' | 'large' | null;
+    if (savedTheme && savedTheme !== 'light') applyTheme(savedTheme);
+    if (savedFont && savedFont !== 'medium') applyFontSize(savedFont);
+  }, []);
 
   // Heartbeat : met à jour last_seen toutes les 60 secondes
   useEffect(() => {
@@ -45,7 +55,6 @@ export default function App() {
         const reg = await navigator.serviceWorker.register('/sw.js');
         const existing = await reg.pushManager.getSubscription();
         if (existing) {
-          // Déjà abonné, on re-synchronise avec le serveur
           await api.subscribePush(existing.toJSON()).catch(() => {});
           return;
         }
@@ -79,6 +88,7 @@ export default function App() {
         {activeTab === 'messages' && <Messages />}
         {activeTab === 'map' && <MapPage />}
         {activeTab === 'members' && <Members />}
+        {activeTab === 'settings' && <Settings />}
       </main>
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
     </div>

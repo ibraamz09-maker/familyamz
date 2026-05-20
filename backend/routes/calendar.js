@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { db } = require('../db');
 const { authMiddleware } = require('../middleware/auth');
+const { notifyFamily } = require('../push');
 
 router.get('/', authMiddleware, async (req, res) => {
   try {
@@ -40,24 +41,66 @@ router.get('/', authMiddleware, async (req, res) => {
 
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { title, date, time, member_id, member_ids, description } = req.body;
+    const { title, date, time, member_id, member_ids, description, urgent, recurrence } = req.body;
     if (!title || !date) return res.status(400).json({ error: 'Titre et date requis' });
     const memberIdsJson = member_ids && member_ids.length > 0 ? JSON.stringify(member_ids) : '';
+    const isUrgent = urgent ? 1 : 0;
+    const rec = recurrence || 'none';
+
     const result = await db.execute(
-      'INSERT INTO events (family_id, member_id, title, date, time, description, member_ids) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [req.user.familyId, member_id || null, title, date, time || '', description || '', memberIdsJson]
+      'INSERT INTO events (family_id, member_id, title, date, time, description, member_ids, urgent, recurrence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [req.user.familyId, member_id || null, title, date, time || '', description || '', memberIdsJson, isUrgent, rec]
     );
-    res.json({ id: Number(result.lastInsertRowid) });
+    const firstId = Number(result.lastInsertRowid);
+
+    // Créer les occurrences récurrentes
+    if (rec === 'weekly') {
+      const baseDate = new Date(date + 'T00:00:00');
+      for (let i = 1; i <= 12; i++) {
+        const d = new Date(baseDate);
+        d.setDate(baseDate.getDate() + i * 7);
+        const ds = d.toISOString().split('T')[0];
+        await db.execute(
+          'INSERT INTO events (family_id, member_id, title, date, time, description, member_ids, urgent, recurrence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [req.user.familyId, member_id || null, title, ds, time || '', description || '', memberIdsJson, 0, 'weekly']
+        ).catch(() => {});
+      }
+    } else if (rec === 'monthly') {
+      const baseDate = new Date(date + 'T00:00:00');
+      for (let i = 1; i <= 6; i++) {
+        const d = new Date(baseDate);
+        d.setMonth(baseDate.getMonth() + i);
+        const ds = d.toISOString().split('T')[0];
+        await db.execute(
+          'INSERT INTO events (family_id, member_id, title, date, time, description, member_ids, urgent, recurrence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [req.user.familyId, member_id || null, title, ds, time || '', description || '', memberIdsJson, 0, 'monthly']
+        ).catch(() => {});
+      }
+    }
+
+    // Notification push si urgent
+    if (isUrgent) {
+      const senderName = req.user.memberName || 'Famille';
+      notifyFamily(
+        req.user.familyId, req.user.memberId,
+        `🚨 Urgence : ${title}`,
+        `${senderName} a ajouté un événement urgent le ${date}${time ? ' à ' + time : ''}`
+      ).catch(() => {});
+    }
+
+    res.json({ id: firstId });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
-    const { title, date, time, member_id, member_ids, description } = req.body;
+    const { title, date, time, member_id, member_ids, description, urgent, recurrence } = req.body;
     const memberIdsJson = member_ids && member_ids.length > 0 ? JSON.stringify(member_ids) : '';
+    const isUrgent = urgent ? 1 : 0;
+    const rec = recurrence || 'none';
     await db.execute(
-      'UPDATE events SET title = ?, date = ?, time = ?, member_id = ?, description = ?, member_ids = ? WHERE id = ? AND family_id = ?',
-      [title, date, time || '', member_id || null, description || '', memberIdsJson, req.params.id, req.user.familyId]
+      'UPDATE events SET title = ?, date = ?, time = ?, member_id = ?, description = ?, member_ids = ?, urgent = ?, recurrence = ? WHERE id = ? AND family_id = ?',
+      [title, date, time || '', member_id || null, description || '', memberIdsJson, isUrgent, rec, req.params.id, req.user.familyId]
     );
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
