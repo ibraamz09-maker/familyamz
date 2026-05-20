@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../api';
 
+
 type Theme = 'light' | 'dark' | 'rose' | 'blue';
 type FontSize = 'small' | 'medium' | 'large';
 
@@ -44,11 +45,32 @@ export default function Settings() {
   const [notifLoading, setNotifLoading] = useState(false);
   const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem('familyamz_gemini_key') || '');
   const [geminiSaved, setGeminiSaved] = useState(false);
+  const [geminiTestResult, setGeminiTestResult] = useState<string | null>(null);
+  const [geminiTesting, setGeminiTesting] = useState(false);
 
   const saveGeminiKey = () => {
     localStorage.setItem('familyamz_gemini_key', geminiKey.trim());
     setGeminiSaved(true);
     setTimeout(() => setGeminiSaved(false), 2000);
+  };
+
+  const testGemini = async () => {
+    setGeminiTesting(true);
+    setGeminiTestResult(null);
+    try {
+      const res = await api.testGemini();
+      const working = res.results.find(r => r.ok);
+      if (working) {
+        setGeminiTestResult(`✅ Gemini fonctionne ! Modèle : ${working.model} (clé : ${res.keyPrefix})`);
+      } else {
+        const errors = res.results.map(r => `${r.model}: ${r.error}`).join('\n');
+        setGeminiTestResult(`❌ Gemini échoue :\n${errors}`);
+      }
+    } catch (e) {
+      setGeminiTestResult(`❌ Erreur : ${e instanceof Error ? e.message : 'Inconnue'}`);
+    } finally {
+      setGeminiTesting(false);
+    }
   };
 
   useEffect(() => {
@@ -210,6 +232,23 @@ export default function Settings() {
           <div style={{ fontSize: 13, color: 'var(--danger)', background: '#FEE2E2', padding: '10px 12px', borderRadius: 8 }}>
             Les notifications ont été refusées. Pour les réactiver :<br />
             <strong>Réglages iPhone → Safari → {family?.name || 'ce site'} → Notifications → Autoriser</strong>
+          </div>
+        )}
+      </div>
+
+      {/* Diagnostic Gemini */}
+      <p className="section-title">Diagnostic IA (Gemini)</p>
+      <div className="card" style={{ marginBottom: 20 }}>
+        <button
+          onClick={testGemini}
+          disabled={geminiTesting}
+          style={{ width: '100%', padding: '12px', borderRadius: 'var(--radius)', background: 'var(--primary)', color: 'white', border: 'none', fontWeight: 700, fontSize: 15, cursor: 'pointer', marginBottom: geminiTestResult ? 12 : 0 }}
+        >
+          {geminiTesting ? '⏳ Test en cours...' : '🔍 Tester la connexion Gemini'}
+        </button>
+        {geminiTestResult && (
+          <div style={{ fontSize: 13, padding: '10px 12px', borderRadius: 8, background: geminiTestResult.startsWith('✅') ? '#D1FAE5' : '#FEE2E2', color: geminiTestResult.startsWith('✅') ? '#065F46' : 'var(--danger)', whiteSpace: 'pre-line', fontWeight: 600 }}>
+            {geminiTestResult}
           </div>
         )}
       </div>

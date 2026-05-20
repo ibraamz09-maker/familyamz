@@ -12,10 +12,10 @@ router.get('/', authMiddleware, async (req, res) => {
       WHERE e.family_id = ?`;
     const args = [req.user.familyId];
     if (year && month) {
-      sql += ' AND strftime("%Y-%m", e.date) = ?';
+      sql += ` AND strftime('%Y-%m', e.date) = ?`;
       args.push(`${year}-${String(month).padStart(2, '0')}`);
     } else if (year) {
-      sql += ' AND strftime("%Y", e.date) = ?';
+      sql += ` AND strftime('%Y', e.date) = ?`;
       args.push(year);
     }
     sql += ' ORDER BY e.date DESC, e.created_at DESC';

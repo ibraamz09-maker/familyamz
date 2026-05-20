@@ -107,4 +107,6 @@ export const api = {
   getReceiptFileUrl: (id: number) => `/api/receipts/${id}/file?token=${getToken()}`,
   analyzeReceipt: (data: string, mimetype: string) =>
     req<{ amount: number | null; date: string; category: string; description: string }>('POST', '/receipts/analyze', { data, mimetype }),
+  testGemini: () =>
+    req<{ keyPrefix: string; results: { model: string; ok: boolean; response?: string; error?: string }[] }>('GET', '/receipts/test-gemini'),
 };

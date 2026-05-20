@@ -4,26 +4,77 @@ const { db } = require('../db');
 const { authMiddleware } = require('../middleware/auth');
 const CATEGORIES = ['Loisirs', 'Vêtements', 'Abonnements', 'Électricité', 'Essence', 'Autres'];
 
-async function analyzeWithGemini(base64Data, mimetype) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
-  try {
-    const today = new Date().toISOString().slice(0, 10);
-    const prompt = `Analyse ce ticket de caisse ou cette facture. Catégories disponibles: ${CATEGORIES.join(', ')}. Date du jour si non trouvée: ${today}. Réponds UNIQUEMENT avec ce JSON sans markdown: {"amount": <montant total décimal ou null>, "date": "<YYYY-MM-DD>", "category": "<une des catégories>", "description": "<nom du magasin>"}`;
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ inline_data: { mime_type: mimetype, data: base64Data } }, { text: prompt }] }] }),
-    });
-    const data = await response.json();
-    if (data.error) { console.error('Gemini error:', data.error.message); return null; }
-    const text = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim().replace(/```json\n?|\n?```/g, '');
-    return JSON.parse(text);
-  } catch (e) {
-    console.error('Gemini error:', e.message);
-    return null;
-  }
+// Modèles à essayer dans l'ordre
+const GEMINI_MODELS = [
+  'gemini-2.0-flash',
+  'gemini-1.5-flash',
+  'gemini-1.5-flash-latest',
+];
+
+async function callGemini(apiKey, model, parts) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contents: [{ parts }] }),
+  });
+  const data = await response.json();
+  if (data.error) throw new Error(`Gemini ${model}: ${data.error.message} (code ${data.error.code})`);
+  return data;
 }
+
+async function analyzeWithGemini(base64Data, mimetype) {
+  const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+  if (!apiKey) { console.error('[Gemini] GEMINI_API_KEY non défini'); return null; }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const prompt = `Analyse ce ticket de caisse ou cette facture. Catégories disponibles: ${CATEGORIES.join(', ')}. Date du jour si non trouvée: ${today}. Réponds UNIQUEMENT avec ce JSON sans markdown: {"amount": <montant total décimal ou null>, "date": "<YYYY-MM-DD>", "category": "<une des catégories>", "description": "<nom du magasin>"}`;
+  const parts = [
+    { inline_data: { mime_type: mimetype, data: base64Data } },
+    { text: prompt },
+  ];
+
+  for (const model of GEMINI_MODELS) {
+    try {
+      const data = await callGemini(apiKey, model, parts);
+      const raw = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
+      console.log(`[Gemini] Réponse brute (${model}):`, raw.slice(0, 200));
+
+      // Extraire le JSON même s'il y a du texte autour
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) { console.error(`[Gemini] Pas de JSON trouvé dans la réponse`); continue; }
+      const parsed = JSON.parse(jsonMatch[0]);
+      console.log(`[Gemini] Succès avec ${model}:`, parsed);
+      return parsed;
+    } catch (e) {
+      console.error(`[Gemini] Échec avec ${model}:`, e.message);
+      // Clé invalide → inutile d'essayer les autres modèles
+      if (e.message.includes('API_KEY') || e.message.includes('401') || e.message.includes('403')) break;
+      // Modèle non dispo ou quota → essayer le suivant
+      continue;
+    }
+  }
+  return null;
+}
+
+// Endpoint de diagnostic — test la connexion Gemini sans image
+router.get('/test-gemini', authMiddleware, async (req, res) => {
+  const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+  if (!apiKey) return res.json({ ok: false, error: 'GEMINI_API_KEY non défini dans les variables Render' });
+
+  const results = [];
+  for (const model of GEMINI_MODELS) {
+    try {
+      const data = await callGemini(apiKey, model, [{ text: 'Réponds juste "ok"' }]);
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      results.push({ model, ok: true, response: text.slice(0, 50) });
+      break; // Premier modèle qui fonctionne = on s'arrête
+    } catch (e) {
+      results.push({ model, ok: false, error: e.message });
+    }
+  }
+  res.json({ keyPrefix: apiKey.slice(0, 8) + '...', results });
+});
 
 router.post('/analyze', authMiddleware, async (req, res) => {
   try {

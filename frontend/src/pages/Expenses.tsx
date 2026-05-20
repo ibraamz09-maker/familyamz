@@ -90,6 +90,7 @@ export default function Expenses() {
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [geminiSuccess, setGeminiSuccess] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [receiptForm, setReceiptForm] = useState({
     filename: '', mimetype: '', data: '',
@@ -173,18 +174,48 @@ export default function Expenses() {
     if (!form.amount || !form.date || !form.category) return;
     setLoading(true);
     try {
+      const parsedAmount = parseFloat(form.amount.replace(',', '.'));
       const data = {
-        amount: parseFloat(form.amount.replace(',', '.')),
+        amount: parsedAmount,
         date: form.date,
         category: form.category,
         member_id: form.member_ids.length === 1 ? form.member_ids[0] : null,
         member_ids: form.member_ids,
         description: form.description,
       };
-      if (editingExpense) await api.updateExpense(editingExpense.id, data);
-      else await api.createExpense(data);
+
+      const membersInfoOptimistic = form.member_ids
+        .map(id => members.find(m => Number(m.id) === id))
+        .filter((m): m is Member => Boolean(m));
+
+      if (editingExpense) {
+        // Mise à jour optimiste
+        setExpenses(prev => prev.map(ex =>
+          ex.id === editingExpense.id
+            ? { ...ex, amount: parsedAmount, date: form.date, category: form.category, description: form.description, member_id: data.member_id ?? null, member_ids: JSON.stringify(form.member_ids), members_info: membersInfoOptimistic }
+            : ex
+        ));
+        await api.updateExpense(editingExpense.id, data);
+      } else {
+        // Ajout optimiste — afficher immédiatement sans attendre le serveur
+        const optimistic: Expense = {
+          id: Date.now(), // id temporaire
+          family_id: 0,
+          member_id: data.member_id ?? null,
+          member_ids: JSON.stringify(form.member_ids),
+          amount: parsedAmount,
+          date: form.date,
+          category: form.category,
+          description: form.description,
+          members_info: membersInfoOptimistic,
+        };
+        setExpenses(prev => [optimistic, ...prev]);
+        await api.createExpense(data);
+      }
+
       setShowModal(false);
-      await fetchData();
+      // Sync en arrière-plan pour remplacer l'id temporaire par le vrai
+      fetchData().catch(() => {});
     } finally {
       setLoading(false);
     }
@@ -207,12 +238,12 @@ export default function Expenses() {
   const allExpenseSelected = allMemberIds.length > 0 && allMemberIds.every(id => selectedExpenseIds.includes(id));
   const tousExpenseActive = selectedExpenseIds.length === 0 || allExpenseSelected;
 
-  const total = expenses.reduce((s, e) => s + e.amount, 0);
+  const total = expenses.reduce((s, e) => s + Number(e.amount), 0);
 
   // Monthly: category totals
   const categoryTotals = EXPENSE_CATEGORIES.map(cat => ({
     cat,
-    total: expenses.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0),
+    total: expenses.filter(e => e.category === cat).reduce((s, e) => s + Number(e.amount), 0),
   })).filter(c => c.total > 0);
 
   // Annual: chart data
@@ -221,7 +252,7 @@ export default function Expenses() {
     const mExp = expenses.filter(e => e.date.startsWith(mStr));
     const entry: Record<string, string | number> = { month: name.slice(0, 3) };
     EXPENSE_CATEGORIES.forEach(cat => {
-      entry[cat] = mExp.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0);
+      entry[cat] = mExp.filter(e => e.category === cat).reduce((s, e) => s + Number(e.amount), 0);
     });
     return entry;
   });
@@ -330,7 +361,7 @@ export default function Expenses() {
           {/* Monthly breakdown for annual view */}
           {MONTHS_FR.map((name, i) => {
             const mStr = `${year}-${String(i + 1).padStart(2, '0')}`;
-            const mTotal = expenses.filter(e => e.date.startsWith(mStr)).reduce((s, e) => s + e.amount, 0);
+            const mTotal = expenses.filter(e => e.date.startsWith(mStr)).reduce((s, e) => s + Number(e.amount), 0);
             if (mTotal === 0) return null;
             return (
               <div key={i} className="expense-item">
@@ -466,6 +497,11 @@ export default function Expenses() {
                 )}
               </div>
             </label>
+            {geminiSuccess && (
+              <div style={{ background: '#D1FAE5', color: '#065F46', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 600, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                ✅ Gemini a rempli les champs automatiquement
+              </div>
+            )}
             <input
               id="receipt-file-upload"
               ref={fileRef}
@@ -482,12 +518,20 @@ export default function Expenses() {
                 else setReceiptPreview(null);
                 // Analyse automatique avec Gemini
                 setAnalyzing(true);
+                setGeminiSuccess(false);
                 try {
-                  // Essayer le serveur d'abord, puis clé locale en fallback
+                  // Essayer le serveur d'abord, puis clé localStorage en fallback
                   let result = null;
                   try {
                     result = await api.analyzeReceipt(compressed.data, compressed.mimetype);
+                    // Si le serveur renvoie un résultat vide (clé manquante ou parsing raté),
+                    // essayer directement avec la clé localStorage
+                    if (!result.description && result.amount == null) {
+                      const local = await analyzeWithGemini(compressed.data, compressed.mimetype);
+                      if (local) result = local;
+                    }
                   } catch {
+                    // Erreur réseau → fallback localStorage
                     result = await analyzeWithGemini(compressed.data, compressed.mimetype);
                   }
                   if (result && (result.description || result.amount != null)) {
@@ -498,6 +542,8 @@ export default function Expenses() {
                       category: (result!.category as import('../types').ExpenseCategory) || f.category,
                       description: result!.description || f.description,
                     }));
+                    setGeminiSuccess(true);
+                    setTimeout(() => setGeminiSuccess(false), 4000);
                   }
                 } finally { setAnalyzing(false); }
               }}
