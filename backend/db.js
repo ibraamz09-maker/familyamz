@@ -125,6 +125,13 @@ async function init() {
   try { await db.execute('ALTER TABLE members ADD COLUMN location_at DATETIME'); } catch (e) {}
   try { await db.execute('ALTER TABLE members ADD COLUMN last_seen DATETIME'); } catch (e) {}
   try { await db.execute("ALTER TABLE events ADD COLUMN member_ids TEXT DEFAULT ''"); } catch (e) {}
+  // Renommage Foad → Papa (migration unique)
+  try {
+    await db.execute(
+      "UPDATE members SET name = 'Papa' WHERE name = 'Foad' AND family_id = (SELECT id FROM families WHERE identifier = 'amenzou')"
+    );
+  } catch (e) {}
+
   try { await db.execute("ALTER TABLE events ADD COLUMN urgent INTEGER DEFAULT 0"); } catch (e) {}
   try { await db.execute("ALTER TABLE events ADD COLUMN recurrence TEXT DEFAULT 'none'"); } catch (e) {}
   try { await db.execute("ALTER TABLE messages ADD COLUMN audio TEXT DEFAULT ''"); } catch (e) {}
@@ -141,7 +148,7 @@ async function init() {
   const AMENZOU_NAME = 'Amenzou';
   const AMENZOU_PWD = 'Foad1974@';
   const AMENZOU_MEMBERS = [
-    { name: 'Foad',    password: 'Foad1974',   color: '#3B82F6' },
+    { name: 'Papa',    password: 'Foad1974',   color: '#3B82F6' },
     { name: 'Ibrahim', password: 'Ibrahim2009', color: '#22C55E' },
     { name: 'Imen',    password: 'Imen2005',    color: '#EC4899' },
     { name: 'Assia',   password: 'Assia2004',   color: '#F97316' },

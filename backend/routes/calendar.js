@@ -20,21 +20,23 @@ router.get('/', authMiddleware, async (req, res) => {
     }
     sql += ' ORDER BY e.date, e.time, e.created_at';
     const result = await db.execute({ sql, args });
-    // Enrichir avec les noms des membres concernés
-    const events = await Promise.all(result.rows.map(async (ev) => {
+    // Charger tous les membres de la famille une seule fois (évite les soucis IN clause Turso)
+    const allMembersRes = await db.execute('SELECT id, name, color FROM members WHERE family_id = ?', [req.user.familyId]);
+    const memberMap = {};
+    for (const m of allMembersRes.rows) {
+      memberMap[Number(m.id)] = m;
+    }
+    // Enrichir chaque événement avec members_info
+    const events = result.rows.map(ev => {
       let membersInfo = [];
       if (ev.member_ids) {
         try {
-          const ids = JSON.parse(ev.member_ids);
-          if (ids.length > 0) {
-            const placeholders = ids.map(() => '?').join(',');
-            const mRes = await db.execute({ sql: `SELECT id, name, color FROM members WHERE id IN (${placeholders})`, args: ids });
-            membersInfo = mRes.rows;
-          }
+          const ids = JSON.parse(ev.member_ids).map(Number);
+          membersInfo = ids.map(id => memberMap[id]).filter(Boolean);
         } catch {}
       }
       return { ...ev, members_info: membersInfo };
-    }));
+    });
     res.json(events);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

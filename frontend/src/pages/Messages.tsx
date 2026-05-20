@@ -12,16 +12,27 @@ function VoiceBubble({ audio, isMe }: { audio: string; isMe: boolean }) {
 
   const toggle = () => {
     if (!audioRef.current) {
-      audioRef.current = new Audio(audio);
-      audioRef.current.onended = () => setPlaying(false);
+      const a = new Audio();
+      a.src = audio;
+      a.onended = () => setPlaying(false);
+      a.onerror = () => { setPlaying(false); };
+      audioRef.current = a;
     }
     if (playing) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
       setPlaying(false);
     } else {
-      audioRef.current.play();
-      setPlaying(true);
+      const playPromise = audioRef.current.play();
+      if (playPromise) {
+        playPromise.then(() => setPlaying(true)).catch(() => {
+          // Sur iOS, relancer depuis l'event handler direct
+          audioRef.current?.play().catch(() => {});
+          setPlaying(true);
+        });
+      } else {
+        setPlaying(true);
+      }
     }
   };
 
@@ -103,14 +114,23 @@ export default function Messages() {
   };
 
   const startRecording = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      alert('Votre navigateur ne supporte pas l\'enregistrement audio.');
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream);
+      // Détecter le meilleur format supporté
+      const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus']
+        .find(t => MediaRecorder.isTypeSupported(t)) || '';
+      const mr = new MediaRecorder(stream, mimeType ? { mimeType } : {});
       chunksRef.current = [];
       mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       mr.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        const actualType = mr.mimeType || mimeType || 'audio/webm';
+        const blob = new Blob(chunksRef.current, { type: actualType });
+        if (blob.size < 100) return; // Enregistrement vide
         const reader = new FileReader();
         reader.onloadend = async () => {
           const base64 = reader.result as string;
@@ -122,13 +142,13 @@ export default function Messages() {
         };
         reader.readAsDataURL(blob);
       };
-      mr.start();
+      mr.start(100); // Collecter les données toutes les 100ms
       mediaRecorderRef.current = mr;
       setIsRecording(true);
       setRecordingSeconds(0);
       timerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000);
     } catch {
-      alert('Impossible d\'accéder au microphone. Vérifiez les permissions.');
+      alert('Impossible d\'accéder au microphone. Vérifiez les permissions dans les réglages de votre navigateur.');
     }
   };
 

@@ -128,9 +128,9 @@ export default function Calendar() {
         await api.createEvent(data);
         await fetchMonthData();
         await fetchWeekData();
-        // Garder le modal ouvert pour voir l'événement ajouté
         setForm({ title: '', description: '', member_ids: [], time: '', urgent: false, recurrence: 'none' });
         setEditingEvent(null);
+        setShowModal(false);
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erreur lors de l\'enregistrement');

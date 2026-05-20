@@ -104,7 +104,7 @@ export const api = {
     description?: string; member_id?: number | null;
   }) => req<{ id: number }>('POST', '/receipts', data),
   deleteReceipt: (id: number) => req('DELETE', `/receipts/${id}`),
-  getReceiptFileUrl: (id: number) => `/api/receipts/${id}/file`,
+  getReceiptFileUrl: (id: number) => `/api/receipts/${id}/file?token=${getToken()}`,
   analyzeReceipt: (data: string, mimetype: string) =>
     req<{ amount: number | null; date: string; category: string; description: string }>('POST', '/receipts/analyze', { data, mimetype }),
 };
