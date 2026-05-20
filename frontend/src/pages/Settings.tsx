@@ -47,6 +47,9 @@ export default function Settings() {
   const [geminiSaved, setGeminiSaved] = useState(false);
   const [geminiTestResult, setGeminiTestResult] = useState<string | null>(null);
   const [geminiTesting, setGeminiTesting] = useState(false);
+  const [archiveYear, setArchiveYear] = useState(new Date().getFullYear() - 1);
+  const [archiving, setArchiving] = useState(false);
+  const [archiveDone, setArchiveDone] = useState(false);
 
   const saveGeminiKey = () => {
     localStorage.setItem('familyamz_gemini_key', geminiKey.trim());
@@ -249,6 +252,61 @@ export default function Settings() {
         {geminiTestResult && (
           <div style={{ fontSize: 13, padding: '10px 12px', borderRadius: 8, background: geminiTestResult.startsWith('✅') ? '#D1FAE5' : '#FEE2E2', color: geminiTestResult.startsWith('✅') ? '#065F46' : 'var(--danger)', whiteSpace: 'pre-line', fontWeight: 600 }}>
             {geminiTestResult}
+          </div>
+        )}
+      </div>
+
+      {/* Archivage annuel des tickets */}
+      <p className="section-title">Archivage des tickets</p>
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 14, lineHeight: 1.5 }}>
+          📦 Télécharge tous les tickets d'une année en ZIP (photos + résumé CSV), puis supprime-les de l'app pour libérer de l'espace. Les <strong>dépenses restent</strong>.
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <label style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-2)' }}>Année :</label>
+          <select className="select" style={{ marginBottom: 0, flex: 1 }} value={archiveYear} onChange={e => { setArchiveYear(Number(e.target.value)); setArchiveDone(false); }}>
+            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Étape 1 : Télécharger le ZIP */}
+        <a
+          href={api.exportReceiptsYear(archiveYear)}
+          download={`tickets-${archiveYear}.zip`}
+          style={{ display: 'block', textDecoration: 'none' }}
+          onClick={() => setArchiveDone(true)}
+        >
+          <button style={{ width: '100%', padding: '12px', borderRadius: 'var(--radius)', background: 'var(--primary)', color: 'white', border: 'none', fontWeight: 700, fontSize: 15, cursor: 'pointer', marginBottom: 10 }}>
+            ⬇️ Télécharger les tickets {archiveYear}
+          </button>
+        </a>
+
+        {/* Étape 2 : Supprimer (seulement si téléchargé) */}
+        {archiveDone && (
+          <button
+            onClick={async () => {
+              if (!confirm(`Supprimer TOUTES les images de ${archiveYear} de l'app ? Les dépenses restent. Cette action est irréversible.`)) return;
+              setArchiving(true);
+              try {
+                const res = await api.deleteReceiptsYear(archiveYear);
+                alert(`✅ ${res.deleted} ticket(s) supprimé(s) de l'app. Les dépenses sont conservées.`);
+                setArchiveDone(false);
+              } catch {
+                alert('❌ Erreur lors de la suppression');
+              } finally { setArchiving(false); }
+            }}
+            disabled={archiving}
+            style={{ width: '100%', padding: '12px', borderRadius: 'var(--radius)', background: '#FEE2E2', color: 'var(--danger)', border: 'none', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}
+          >
+            {archiving ? '...' : `🗑️ Supprimer les images ${archiveYear} de l'app`}
+          </button>
+        )}
+
+        {!archiveDone && (
+          <div style={{ fontSize: 12, color: 'var(--text-2)', textAlign: 'center', marginTop: 4 }}>
+            Télécharge d'abord le ZIP avant de supprimer
           </div>
         )}
       </div>

@@ -155,6 +155,63 @@ router.post('/analyze', authMiddleware, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Export ZIP de tous les tickets d'une année ───────────────────────────────
+router.get('/export/:year', authMiddleware, async (req, res) => {
+  try {
+    const { year } = req.params;
+    const result = await db.execute({
+      sql: `SELECT id, filename, mimetype, data, amount, date, category, description FROM receipts WHERE family_id = ? AND strftime('%Y', date) = ? ORDER BY date ASC`,
+      args: [req.user.familyId, year],
+    });
+    const rows = result.rows;
+    if (rows.length === 0) return res.status(404).json({ error: 'Aucun ticket pour cette année' });
+
+    const archiver = require('archiver');
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="tickets-${year}.zip"`);
+
+    const archive = archiver('zip', { zlib: { level: 6 } });
+    archive.pipe(res);
+
+    // Ajouter chaque image
+    const nameCount = {};
+    for (const r of rows) {
+      const buf = Buffer.from(r.data, 'base64');
+      const ext = r.mimetype === 'application/pdf' ? '.pdf' : r.mimetype.includes('png') ? '.png' : '.jpg';
+      const base = `${r.date}_${(r.description || r.filename || 'ticket').replace(/[^a-zA-Z0-9_\-]/g, '_').slice(0, 40)}`;
+      nameCount[base] = (nameCount[base] || 0) + 1;
+      const name = nameCount[base] > 1 ? `${base}_${nameCount[base]}${ext}` : `${base}${ext}`;
+      archive.append(buf, { name });
+    }
+
+    // Ajouter un résumé CSV
+    const lines = ['Date,Montant,Catégorie,Description'];
+    for (const r of rows) {
+      lines.push(`${r.date},${r.amount != null ? r.amount : ''},${r.category},"${(r.description || '').replace(/"/g, '""')}"`);
+    }
+    archive.append(lines.join('\n'), { name: `resume-${year}.csv` });
+
+    archive.finalize();
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Supprimer les images d'une année (garde les dépenses liées) ───────────────
+router.delete('/year/:year', authMiddleware, async (req, res) => {
+  try {
+    const { year } = req.params;
+    const result = await db.execute({
+      sql: `SELECT COUNT(*) as cnt FROM receipts WHERE family_id = ? AND strftime('%Y', date) = ?`,
+      args: [req.user.familyId, year],
+    });
+    const count = Number(result.rows[0].cnt);
+    await db.execute({
+      sql: `DELETE FROM receipts WHERE family_id = ? AND strftime('%Y', date) = ?`,
+      args: [req.user.familyId, year],
+    });
+    res.json({ ok: true, deleted: count });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 router.get('/', authMiddleware, async (req, res) => {
   try {
     const { year, month, category } = req.query;
