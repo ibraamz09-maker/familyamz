@@ -68,12 +68,14 @@ export interface Expense {
   id: number;
   family_id: number;
   member_id: number | null;
+  member_ids?: string;
   amount: number;
   date: string;
   category: string;
   description: string;
   member_name?: string;
   member_color?: string;
+  members_info?: { id: number; name: string; color: string }[];
 }
 
 export type ExpenseCategory = 'Loisirs' | 'Vêtements' | 'Abonnements' | 'Électricité' | 'Essence' | 'Autres';

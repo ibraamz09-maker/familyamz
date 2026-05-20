@@ -20,17 +20,38 @@ router.get('/', authMiddleware, async (req, res) => {
     }
     sql += ' ORDER BY e.date DESC, e.created_at DESC';
     const result = await db.execute({ sql, args });
-    res.json(result.rows);
+
+    // Charger tous les membres pour enrichir members_info (comme calendar.js)
+    const allMembersRes = await db.execute('SELECT id, name, color FROM members WHERE family_id = ?', [req.user.familyId]);
+    const memberMap = {};
+    for (const m of allMembersRes.rows) {
+      memberMap[Number(m.id)] = m;
+    }
+
+    const expenses = result.rows.map(ex => {
+      let membersInfo = [];
+      if (ex.member_ids) {
+        try {
+          const ids = JSON.parse(ex.member_ids).map(Number);
+          membersInfo = ids.map(id => memberMap[id]).filter(Boolean);
+        } catch {}
+      }
+      const effectiveColor = membersInfo.length > 0 ? membersInfo[0].color : (ex.member_color || null);
+      return { ...ex, members_info: membersInfo, member_color: effectiveColor };
+    });
+
+    res.json(expenses);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { amount, date, category, member_id, description } = req.body;
+    const { amount, date, category, member_id, member_ids, description } = req.body;
     if (!amount || !date || !category) return res.status(400).json({ error: 'Montant, date et catégorie requis' });
+    const memberIdsJson = member_ids && member_ids.length > 0 ? JSON.stringify(member_ids) : '';
     const result = await db.execute(
-      'INSERT INTO expenses (family_id, member_id, amount, date, category, description) VALUES (?, ?, ?, ?, ?, ?)',
-      [req.user.familyId, member_id || null, amount, date, category, description || '']
+      'INSERT INTO expenses (family_id, member_id, amount, date, category, description, member_ids) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [req.user.familyId, member_id || null, amount, date, category, description || '', memberIdsJson]
     );
     const senderName = req.user.memberName || 'Famille';
     notifyFamily(
@@ -44,10 +65,11 @@ router.post('/', authMiddleware, async (req, res) => {
 
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
-    const { amount, date, category, member_id, description } = req.body;
+    const { amount, date, category, member_id, member_ids, description } = req.body;
+    const memberIdsJson = member_ids && member_ids.length > 0 ? JSON.stringify(member_ids) : '';
     await db.execute(
-      'UPDATE expenses SET amount = ?, date = ?, category = ?, member_id = ?, description = ? WHERE id = ? AND family_id = ?',
-      [amount, date, category, member_id || null, description || '', req.params.id, req.user.familyId]
+      'UPDATE expenses SET amount = ?, date = ?, category = ?, member_id = ?, description = ?, member_ids = ? WHERE id = ? AND family_id = ?',
+      [amount, date, category, member_id || null, description || '', memberIdsJson, req.params.id, req.user.familyId]
     );
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }

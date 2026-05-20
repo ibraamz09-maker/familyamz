@@ -85,7 +85,7 @@ export const api = {
     return req<unknown[]>('GET', `/expenses${q}`);
   },
   createExpense: (data: {
-    amount: number; date: string; category: string; member_id?: number | null; description?: string;
+    amount: number; date: string; category: string; member_id?: number | null; member_ids?: number[]; description?: string;
   }) => req('POST', '/expenses', data),
   updateExpense: (id: number, data: unknown) => req('PUT', `/expenses/${id}`, data),
   deleteExpense: (id: number) => req('DELETE', `/expenses/${id}`),

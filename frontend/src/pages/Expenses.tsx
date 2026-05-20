@@ -79,7 +79,7 @@ export default function Expenses() {
     amount: '',
     date: today.toISOString().slice(0, 10),
     category: EXPENSE_CATEGORIES[0],
-    member_id: '',
+    member_ids: [] as number[],
     description: '',
   });
   const [loading, setLoading] = useState(false);
@@ -135,7 +135,7 @@ export default function Expenses() {
       amount: '',
       date: today.toISOString().slice(0, 10),
       category: EXPENSE_CATEGORIES[0],
-      member_id: '',
+      member_ids: [],
       description: '',
     });
     setShowModal(true);
@@ -143,14 +143,26 @@ export default function Expenses() {
 
   const openEdit = (ex: Expense) => {
     setEditingExpense(ex);
+    let ids: number[] = [];
+    try { if (ex.member_ids) ids = JSON.parse(ex.member_ids).map(Number); } catch {}
     setForm({
       amount: String(ex.amount),
       date: ex.date,
       category: ex.category as import('../types').ExpenseCategory,
-      member_id: ex.member_id ? String(ex.member_id) : '',
+      member_ids: ids,
       description: ex.description,
     });
     setShowModal(true);
+  };
+
+  const toggleExpenseMember = (id: number) => {
+    const nid = Number(id);
+    setForm(f => ({
+      ...f,
+      member_ids: f.member_ids.map(Number).includes(nid)
+        ? f.member_ids.filter(x => Number(x) !== nid)
+        : [...f.member_ids, nid],
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -162,7 +174,8 @@ export default function Expenses() {
         amount: parseFloat(form.amount.replace(',', '.')),
         date: form.date,
         category: form.category,
-        member_id: form.member_id ? Number(form.member_id) : null,
+        member_id: form.member_ids.length === 1 ? form.member_ids[0] : null,
+        member_ids: form.member_ids,
         description: form.description,
       };
       if (editingExpense) await api.updateExpense(editingExpense.id, data);
@@ -178,6 +191,18 @@ export default function Expenses() {
     await api.deleteExpense(id);
     await fetchData();
   };
+
+  const getMembersLabel = (ex: Expense) => {
+    if (ex.members_info && ex.members_info.length > 0) return ex.members_info.map(m => m.name).join(', ');
+    if (ex.member_name) return ex.member_name;
+    return null;
+  };
+
+  // Variables sélecteur membres (dépenses)
+  const allMemberIds = members.map(m => Number(m.id));
+  const selectedExpenseIds = form.member_ids.map(Number);
+  const allExpenseSelected = allMemberIds.length > 0 && allMemberIds.every(id => selectedExpenseIds.includes(id));
+  const tousExpenseActive = selectedExpenseIds.length === 0 || allExpenseSelected;
 
   const total = expenses.reduce((s, e) => s + e.amount, 0);
 
@@ -262,7 +287,7 @@ export default function Expenses() {
                   <div className="expense-info">
                     <div className="expense-name">{ex.category}{ex.description ? ` — ${ex.description}` : ''}</div>
                     <div className="expense-meta">
-                      {ex.date}{ex.member_name ? ` · ${ex.member_name}` : ''}
+                      {ex.date}{getMembersLabel(ex) ? ` · ${getMembersLabel(ex)}` : ''}
                     </div>
                   </div>
                 </div>
@@ -528,14 +553,15 @@ export default function Expenses() {
             </select>
             <label className="form-label">Qui est concerné ?</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-              <button type="button" onClick={() => setForm(f => ({ ...f, member_id: '' }))}
-                style={{ padding: '8px 16px', borderRadius: 20, fontWeight: 700, fontSize: 14, cursor: 'pointer', border: `2px solid ${!form.member_id ? '#6B7280' : 'var(--border)'}`, background: !form.member_id ? '#6B7280' : 'var(--surface)', color: !form.member_id ? 'white' : 'var(--text)' }}>
+              <button type="button"
+                onClick={() => setForm(f => ({ ...f, member_ids: allExpenseSelected ? [] : [...allMemberIds] }))}
+                style={{ padding: '8px 16px', borderRadius: 20, fontWeight: 700, fontSize: 14, cursor: 'pointer', border: '2px solid #6B7280', background: tousExpenseActive ? '#6B7280' : 'var(--surface)', color: tousExpenseActive ? 'white' : 'var(--text)' }}>
                 👨‍👩‍👧‍👦 Tous
               </button>
               {members.map(m => {
-                const sel = form.member_id === String(m.id);
+                const sel = selectedExpenseIds.includes(Number(m.id));
                 return (
-                  <button key={m.id} type="button" onClick={() => setForm(f => ({ ...f, member_id: sel ? '' : String(m.id) }))}
+                  <button key={m.id} type="button" onClick={() => toggleExpenseMember(m.id)}
                     style={{ padding: '8px 16px', borderRadius: 20, fontWeight: 700, fontSize: 14, cursor: 'pointer', border: `2px solid ${sel ? m.color : 'var(--border)'}`, background: sel ? m.color : 'var(--surface)', color: sel ? 'white' : 'var(--text)' }}>
                     {m.name}
                   </button>
