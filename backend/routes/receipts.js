@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { db } = require('../db');
 const { authMiddleware } = require('../middleware/auth');
-const CATEGORIES = ['Loisirs', 'Vêtements', 'Abonnements', 'Électricité', 'Essence', 'Autres'];
+const CATEGORIES = ['Courses', 'Restauration', 'Loisirs', 'Vêtements', 'Santé', 'Abonnements', 'Électricité', 'Essence', 'Autres'];
 
 const PROMPT = (today) =>
   `Analyse ce ticket de caisse ou cette facture. Catégories disponibles: ${CATEGORIES.join(', ')}. Date du jour si non trouvée: ${today}. Réponds UNIQUEMENT avec ce JSON sans markdown: {"amount": <montant total décimal ou null>, "date": "<YYYY-MM-DD>", "category": "<une des catégories>", "description": "<nom du magasin>"}`;

@@ -78,10 +78,10 @@ export interface Expense {
   members_info?: { id: number; name: string; color: string }[];
 }
 
-export type ExpenseCategory = 'Loisirs' | 'Vêtements' | 'Abonnements' | 'Électricité' | 'Essence' | 'Autres';
+export type ExpenseCategory = 'Courses' | 'Restauration' | 'Loisirs' | 'Vêtements' | 'Santé' | 'Abonnements' | 'Électricité' | 'Essence' | 'Autres';
 
 export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
-  'Loisirs', 'Vêtements', 'Abonnements', 'Électricité', 'Essence', 'Autres',
+  'Courses', 'Restauration', 'Loisirs', 'Vêtements', 'Santé', 'Abonnements', 'Électricité', 'Essence', 'Autres',
 ];
 
 export const MONTHS_FR = [
@@ -90,8 +90,11 @@ export const MONTHS_FR = [
 ];
 
 export const CATEGORY_COLORS: Record<string, string> = {
+  Courses: '#22C55E',
+  Restauration: '#F59E0B',
   Loisirs: '#F97316',
   Vêtements: '#EC4899',
+  Santé: '#06B6D4',
   Abonnements: '#8B5CF6',
   Électricité: '#EAB308',
   Essence: '#EF4444',

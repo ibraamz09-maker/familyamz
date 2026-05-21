@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { api } from '../api';
-import { Message } from '../types';
+import { Message, Member } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 
 // Génère une forme d'onde fictive pour les messages vocaux
@@ -62,6 +62,13 @@ export default function Messages() {
   const [loading, setLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Rappel ciblé
+  const [showReminder, setShowReminder] = useState(false);
+  const [reminderTarget, setReminderTarget] = useState<Member | null>(null);
+  const [reminderText, setReminderText] = useState('');
+  const [reminderSending, setReminderSending] = useState(false);
+  const [reminderDone, setReminderDone] = useState(false);
+  const [members, setMembers] = useState<Member[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -82,6 +89,26 @@ export default function Messages() {
     const interval = setInterval(fetchMessages, 8000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    api.getMembers().then(d => setMembers(d as Member[])).catch(() => {});
+  }, []);
+
+  const sendReminder = async () => {
+    if (!reminderTarget || !reminderText.trim()) return;
+    setReminderSending(true);
+    try {
+      await api.notifyMember(reminderTarget.id, `📲 Rappel de ${member?.name || 'la famille'}`, reminderText.trim());
+      setReminderDone(true);
+      setTimeout(() => {
+        setShowReminder(false);
+        setReminderTarget(null);
+        setReminderText('');
+        setReminderDone(false);
+      }, 1500);
+    } catch { alert('Erreur lors de l\'envoi du rappel'); }
+    finally { setReminderSending(false); }
+  };
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -180,8 +207,72 @@ export default function Messages() {
 
   return (
     <div className="chat-container">
-      {/* Bouton paramètres */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+      {/* Rappel ciblé — modal */}
+      {showReminder && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000,
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+        }} onClick={() => setShowReminder(false)}>
+          <div style={{
+            background: 'var(--surface)', borderRadius: '20px 20px 0 0',
+            padding: '24px 20px 32px', width: '100%', maxWidth: 480,
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 4 }}>📲 Envoyer un rappel</div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 16 }}>
+              La notification sera envoyée uniquement à la personne choisie.
+            </div>
+
+            {/* Sélection du membre */}
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8, color: 'var(--text-2)' }}>À qui ?</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+              {members.filter(m => m.id !== member?.id).map(m => (
+                <button
+                  key={m.id}
+                  onClick={() => setReminderTarget(m)}
+                  style={{
+                    padding: '8px 16px', borderRadius: 20, fontWeight: 700, fontSize: 14,
+                    border: `2px solid ${reminderTarget?.id === m.id ? m.color : 'var(--border)'}`,
+                    background: reminderTarget?.id === m.id ? m.color : 'var(--surface)',
+                    color: reminderTarget?.id === m.id ? 'white' : 'var(--text)',
+                    cursor: 'pointer',
+                  }}
+                >{m.name}</button>
+              ))}
+            </div>
+
+            {/* Message */}
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8, color: 'var(--text-2)' }}>Message</div>
+            <input
+              className="input"
+              placeholder="Ex : N'oublie pas ton rendez-vous à 15h !"
+              value={reminderText}
+              onChange={e => setReminderText(e.target.value)}
+              style={{ marginBottom: 16 }}
+            />
+
+            <button
+              className="btn-primary"
+              style={{ width: '100%', fontSize: 15, padding: '12px' }}
+              disabled={!reminderTarget || !reminderText.trim() || reminderSending}
+              onClick={sendReminder}
+            >
+              {reminderDone ? '✅ Rappel envoyé !' : reminderSending ? 'Envoi...' : `📲 Envoyer à ${reminderTarget?.name || '...'}`}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bouton paramètres + rappel */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <button
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 20, padding: '6px 14px', fontSize: 13,
+            fontWeight: 600, color: 'var(--primary)', cursor: 'pointer',
+          }}
+          onClick={() => setShowReminder(true)}
+        >📲 Rappel ciblé</button>
         <button
           style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--text-2)', padding: '4px 8px' }}
           onClick={() => setShowSettings(!showSettings)}

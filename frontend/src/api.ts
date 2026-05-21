@@ -43,6 +43,7 @@ export const api = {
   getVapidKey: () => req<{ key: string }>('GET', '/push/vapid-public-key'),
   subscribePush: (sub: object) => req('POST', '/push/subscribe', sub),
   unsubscribePush: (endpoint: string) => req('POST', '/push/unsubscribe', { endpoint }),
+  notifyMember: (member_id: number, title: string, body?: string) => req('POST', '/push/notify-member', { member_id, title, body }),
   getMembers: () => req<unknown[]>('GET', '/members'),
   createMember: (data: { name: string; color: string; password?: string }) => req('POST', '/members', data),
   updateMember: (id: number, data: { name: string; color: string; password?: string }) => req('PUT', `/members/${id}`, data),

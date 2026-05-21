@@ -20,7 +20,7 @@ async function analyzeWithGemini(imageData: string, mimetype: string): Promise<{
         body: JSON.stringify({
           contents: [{ parts: [
             { inline_data: { mime_type: mimetype, data: imageData } },
-            { text: 'Analyse ce ticket de caisse. Réponds UNIQUEMENT avec ce JSON sans markdown:\n{"amount": <montant total décimal ou null>, "date": "<YYYY-MM-DD>", "category": "<Loisirs|Vêtements|Abonnements|Électricité|Essence|Autres>", "description": "<nom du magasin>"}' },
+            { text: 'Analyse ce ticket de caisse. Réponds UNIQUEMENT avec ce JSON sans markdown:\n{"amount": <montant total décimal ou null>, "date": "<YYYY-MM-DD>", "category": "<Courses|Restauration|Loisirs|Vêtements|Santé|Abonnements|Électricité|Essence|Autres>", "description": "<nom du magasin>"}' },
           ]}],
         }),
       }
