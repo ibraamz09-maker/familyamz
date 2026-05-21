@@ -287,55 +287,64 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* Automatisation iOS Raccourcis */}
+      {/* Configuration OwnTracks */}
       {currentMember && (
         <div style={{ background: 'var(--surface)', borderRadius: 14, padding: '12px 14px', marginBottom: 12, boxShadow: 'var(--shadow)' }}>
           <button
-            onClick={async () => {
-              if (!locationUrl) {
-                try {
-                  const res = await api.getLocationToken();
-                  const url = `https://familyamz.onrender.com/api/location/update?token=${res.token}&lat={latitude}&lng={longitude}`;
-                  setLocationUrl(url);
-                } catch { alert('Erreur lors de la génération du lien'); return; }
-              }
-              setShowShortcut(s => !s);
-            }}
+            onClick={() => setShowShortcut(s => !s)}
             style={{ width: '100%', background: 'none', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', padding: 0 }}
           >
-            <span style={{ fontWeight: 700, fontSize: 14 }}>📱 Automatisation iPhone (app fermée)</span>
+            <span style={{ fontWeight: 700, fontSize: 14 }}>📍 Localisation automatique (OwnTracks)</span>
             <span style={{ fontSize: 18 }}>{showShortcut ? '▲' : '▼'}</span>
           </button>
 
-          {showShortcut && locationUrl && (
+          {showShortcut && (
             <div style={{ marginTop: 12 }}>
-              <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 10, lineHeight: 1.6 }}>
-                Copie ce lien et suis les étapes pour que ton iPhone envoie ta position automatiquement toutes les 15 min, même app fermée :
+              <div style={{ background: '#D1FAE5', color: '#065F46', borderRadius: 8, padding: '8px 12px', fontSize: 13, fontWeight: 600, marginBottom: 12 }}>
+                ✅ OwnTracks envoie ta position automatiquement, même téléphone verrouillé, iOS et Android.
               </div>
 
-              {/* URL à copier */}
-              <div style={{ background: 'var(--bg)', borderRadius: 8, padding: '8px 10px', fontFamily: 'monospace', fontSize: 11, wordBreak: 'break-all', marginBottom: 10, color: 'var(--text)' }}>
-                {locationUrl}
+              {/* Étape 1 */}
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>① Installe OwnTracks</div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                <a href="https://apps.apple.com/app/owntracks/id692824497" target="_blank" rel="noreferrer"
+                  style={{ flex: 1, display: 'block', padding: '10px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, textAlign: 'center', fontSize: 13, fontWeight: 600, color: 'var(--text)', textDecoration: 'none' }}>
+                  🍎 App Store (iPhone)
+                </a>
+                <a href="https://play.google.com/store/apps/details?id=org.owntracks.android" target="_blank" rel="noreferrer"
+                  style={{ flex: 1, display: 'block', padding: '10px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, textAlign: 'center', fontSize: 13, fontWeight: 600, color: 'var(--text)', textDecoration: 'none' }}>
+                  🤖 Play Store (Android)
+                </a>
               </div>
-              <button
-                onClick={() => { navigator.clipboard.writeText(locationUrl); alert('✅ Lien copié !'); }}
-                style={{ width: '100%', padding: '10px', borderRadius: 8, background: 'var(--primary)', color: 'white', border: 'none', fontWeight: 700, fontSize: 14, cursor: 'pointer', marginBottom: 14 }}
-              >
-                📋 Copier le lien
-              </button>
 
-              {/* Instructions */}
-              <div style={{ fontSize: 13, lineHeight: 1.8, color: 'var(--text)' }}>
-                <strong>Configuration Raccourcis iPhone :</strong><br />
-                <span style={{ color: 'var(--text-2)' }}>
-                  1️⃣ Ouvre <strong>Raccourcis</strong> → onglet <strong>Automatisation</strong><br />
-                  2️⃣ <strong>+</strong> → <strong>Heure de la journée</strong><br />
-                  3️⃣ Mets une heure → active <strong>Répéter</strong> → toutes les <strong>15 min</strong> (ou 1h)<br />
-                  4️⃣ Ajoute action : <strong>Obtenir localisation actuelle</strong><br />
-                  5️⃣ Ajoute action : <strong>Obtenir le contenu de l'URL</strong><br />
-                  6️⃣ Colle le lien — remplace <code style={{background:'#eee', padding:'0 3px', borderRadius:3}}>{'{latitude}'}</code> et <code style={{background:'#eee', padding:'0 3px', borderRadius:3}}>{'{longitude}'}</code> par les variables de l'étape 4<br />
-                  7️⃣ Méthode : <strong>GET</strong> → Enregistrer
-                </span>
+              {/* Étape 2 : Configuration */}
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>② Configure OwnTracks (une seule fois)</div>
+              <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.9, marginBottom: 10 }}>
+                Dans OwnTracks → <strong>⚙️ Préférences → Connexion</strong> :<br />
+                <div style={{ background: 'var(--bg)', borderRadius: 8, padding: '10px 12px', marginTop: 8, fontFamily: 'monospace', fontSize: 12 }}>
+                  <div><strong>Mode :</strong> HTTP</div>
+                  <div><strong>URL :</strong>
+                    <span
+                      style={{ color: 'var(--primary)', cursor: 'pointer', marginLeft: 6 }}
+                      onClick={() => {
+                        navigator.clipboard.writeText('https://familyamz.onrender.com/api/owntracks?family=amenzou');
+                        alert('✅ URL copiée !');
+                      }}
+                    >
+                      https://familyamz.onrender.com/api/owntracks?family=amenzou 📋
+                    </span>
+                  </div>
+                  <div><strong>Identifiant :</strong> {currentMember.name}</div>
+                  <div><strong>Mot de passe :</strong> ton mot de passe FamilyAmz</div>
+                  <div><strong>ID appareil :</strong> {currentMember.name.slice(0, 2).toUpperCase()}</div>
+                </div>
+              </div>
+
+              {/* Étape 3 */}
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>③ Active le suivi en arrière-plan</div>
+              <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.7 }}>
+                <strong>iPhone :</strong> Réglages → OwnTracks → Localisation → <strong>"Toujours"</strong><br />
+                <strong>Android :</strong> Applis → OwnTracks → Autorisations → Localisation → <strong>"Toujours autoriser"</strong>
               </div>
             </div>
           )}

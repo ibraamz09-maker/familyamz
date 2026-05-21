@@ -20,6 +20,7 @@ app.use('/api/lists', require('./routes/lists'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/push', require('./routes/push'));
 app.use('/api/location', require('./routes/location'));
+app.use('/api/owntracks', require('./routes/owntracks'));
 
 // Diagnostic connexion base de données
 app.get('/api/health', async (req, res) => {
