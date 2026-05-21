@@ -13,10 +13,6 @@ router.post('/analyze', authMiddleware, async (req, res) => {
     const { text } = req.body;
     if (!text) return res.status(400).json({ error: 'Texte requis' });
 
-    // Clé dédiée à l'assistant vocal, sinon fallback sur la clé générale
-    const apiKey = (process.env.GEMINI_API_KEY_ASSISTANT || process.env.GEMINI_API_KEY || '').trim();
-    if (!apiKey) return res.status(400).json({ error: 'Clé Gemini non configurée' });
-
     const today = todayStr();
     const prompt = `Tu es l'assistant familial de l'app FamilyAmz.
 Date du jour: ${today} (${new Date().toLocaleDateString('fr-FR', { weekday: 'long' })})
@@ -44,44 +40,76 @@ Règles:
 - Si le montant n'est pas clair pour une dépense, mets 0
 - Sois précis sur la catégorie de dépense selon le contexte`;
 
-    // Essayer plusieurs modèles en cascade
-    const MODELS = [
-      { model: 'gemini-1.5-flash-8b', version: 'v1beta' },
-      { model: 'gemini-1.5-flash-8b', version: 'v1' },
-      { model: 'gemini-1.5-flash',    version: 'v1' },
-      { model: 'gemini-2.0-flash-lite', version: 'v1beta' },
-      { model: 'gemini-2.0-flash',    version: 'v1beta' },
-    ];
-
     let raw = '';
     let lastError = '';
-    for (const { model, version } of MODELS) {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`.replace('v1beta/models', `${version}/models`),
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.1, maxOutputTokens: 500 },
-          }),
+
+    // ── 1. Essayer Gemini (5 modèles en cascade) ──
+    const geminiKey = (process.env.GEMINI_API_KEY_ASSISTANT || process.env.GEMINI_API_KEY || '').trim();
+    if (geminiKey) {
+      const GEMINI_MODELS = [
+        { model: 'gemini-1.5-flash-8b', version: 'v1beta' },
+        { model: 'gemini-1.5-flash-8b', version: 'v1' },
+        { model: 'gemini-1.5-flash',    version: 'v1' },
+        { model: 'gemini-2.0-flash-lite', version: 'v1beta' },
+        { model: 'gemini-2.0-flash',    version: 'v1beta' },
+      ];
+      for (const { model, version } of GEMINI_MODELS) {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent?key=${geminiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.1, maxOutputTokens: 500 },
+            }),
+          }
+        );
+        if (response.ok) {
+          const json = await response.json();
+          raw = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          break;
         }
-      );
-      if (response.ok) {
-        const json = await response.json();
-        raw = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        break;
+        const err = await response.json().catch(() => ({}));
+        lastError = `Gemini error ${response.status} (${model}): ${err?.error?.message || 'inconnu'}`;
+        console.warn(`[Assistant] ${lastError}`);
       }
-      const err = await response.json().catch(() => ({}));
-      lastError = `Gemini error ${response.status} (${model}): ${err?.error?.message || 'inconnu'}`;
-      console.warn(`[Assistant] ${lastError}`);
     }
 
-    if (!raw) return res.status(500).json({ error: lastError || 'Tous les modèles Gemini ont échoué' });
+    // ── 2. Fallback Mistral si Gemini a échoué ──
+    if (!raw) {
+      const mistralKey = (process.env.MISTRAL_API_KEY || '').trim();
+      if (mistralKey) {
+        console.log('[Assistant] Gemini épuisé, tentative Mistral...');
+        const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${mistralKey}`,
+          },
+          body: JSON.stringify({
+            model: 'mistral-small-latest',
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.1,
+            max_tokens: 500,
+          }),
+        });
+        if (response.ok) {
+          const json = await response.json();
+          raw = json.choices?.[0]?.message?.content || '';
+        } else {
+          const err = await response.json().catch(() => ({}));
+          lastError = `Mistral error ${response.status}: ${err?.message || 'inconnu'}`;
+          console.warn(`[Assistant] ${lastError}`);
+        }
+      }
+    }
+
+    if (!raw) return res.status(500).json({ error: lastError || 'Tous les modèles IA ont échoué' });
 
     // Extraire le JSON de la réponse
     const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) return res.status(500).json({ error: 'Réponse Gemini invalide' });
+    if (!match) return res.status(500).json({ error: 'Réponse IA invalide' });
 
     const result = JSON.parse(match[0]);
     res.json(result);
