@@ -74,7 +74,7 @@ export const api = {
   deleteEvent: (id: number) => req('DELETE', `/calendar/${id}`),
 
   getTasks: () => req<unknown[]>('GET', '/tasks'),
-  createTask: (title: string) => req('POST', '/tasks', { title }),
+  createTask: (title: string, recurrence?: 'none' | 'daily') => req('POST', '/tasks', { title, recurrence: recurrence || 'none' }),
   updateTask: (id: number, data: { title: string; done: boolean }) => req('PUT', `/tasks/${id}`, data),
   deleteTask: (id: number) => req('DELETE', `/tasks/${id}`),
 

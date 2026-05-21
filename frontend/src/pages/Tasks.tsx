@@ -12,6 +12,7 @@ export default function Tasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
   const [newTitle, setNewTitle] = useState('');
+  const [isDaily, setIsDaily] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Lists state
@@ -39,8 +40,9 @@ export default function Tasks() {
     if (!newTitle.trim()) return;
     setLoading(true);
     try {
-      await api.createTask(newTitle.trim());
+      await api.createTask(newTitle.trim(), isDaily ? 'daily' : 'none');
       setNewTitle('');
+      setIsDaily(false);
       await fetchTasks();
     } finally { setLoading(false); }
   };
@@ -55,13 +57,18 @@ export default function Tasks() {
     await fetchTasks();
   };
 
-  const filtered = tasks.filter(t => {
+  // Tâches quotidiennes séparées des normales
+  const dailyTasks = tasks.filter(t => (t as any).recurrence === 'daily');
+  const normalTasks = tasks.filter(t => (t as any).recurrence !== 'daily');
+
+  const filteredNormal = normalTasks.filter(t => {
     if (filter === 'todo') return t.done === 0;
     if (filter === 'done') return t.done === 1;
     return true;
   });
 
-  const doneCount = tasks.filter(t => t.done === 1).length;
+  const doneCount = normalTasks.filter(t => t.done === 1).length;
+  const dailyDoneCount = dailyTasks.filter(t => t.done === 1).length;
 
   // --- Lists ---
   const handleCreateList = async (e: React.FormEvent) => {
@@ -115,6 +122,48 @@ export default function Tasks() {
       {/* TASKS TAB */}
       {subTab === 'tasks' && (
         <>
+          {/* ── Tâches quotidiennes ── */}
+          {dailyTasks.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                marginBottom: 10, padding: '6px 12px',
+                background: 'var(--surface)', borderRadius: 10,
+                border: '1px solid var(--border)',
+              }}>
+                <span style={{ fontSize: 16 }}>🔄</span>
+                <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-1)' }}>Tâches quotidiennes</span>
+                <span style={{
+                  marginLeft: 'auto', fontSize: 12, fontWeight: 600,
+                  color: dailyDoneCount === dailyTasks.length ? '#16A34A' : 'var(--text-2)',
+                }}>
+                  {dailyDoneCount}/{dailyTasks.length} faites
+                </span>
+              </div>
+
+              {dailyTasks.map(task => (
+                <div key={task.id} className={`task-item ${task.done === 1 ? 'done' : ''}`}
+                  style={{ borderLeft: '3px solid #6366F1' }}>
+                  <button
+                    className={`task-checkbox ${task.done === 1 ? 'checked' : ''}`}
+                    onClick={() => handleToggle(task)}
+                    style={task.done === 1 ? { background: '#6366F1', borderColor: '#6366F1' } : { borderColor: '#6366F1' }}
+                  >
+                    {task.done === 1 ? '✓' : ''}
+                  </button>
+                  <div style={{ flex: 1 }}>
+                    <span className="task-title">{task.title}</span>
+                    <div style={{ fontSize: 11, color: '#6366F1', marginTop: 2 }}>
+                      🔄 Se réinitialise à minuit
+                    </div>
+                  </div>
+                  <button className="btn-icon" onClick={() => handleDelete(task.id)}>🗑️</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── Tâches normales ── */}
           <div className="filter-tabs">
             {(['all', 'todo', 'done'] as Filter[]).map(f => (
               <button
@@ -122,18 +171,18 @@ export default function Tasks() {
                 className={`filter-tab ${filter === f ? 'active' : ''}`}
                 onClick={() => setFilter(f)}
               >
-                {f === 'all' ? `Toutes (${tasks.length})` : f === 'todo' ? `À faire (${tasks.length - doneCount})` : `Faites (${doneCount})`}
+                {f === 'all' ? `Toutes (${normalTasks.length})` : f === 'todo' ? `À faire (${normalTasks.length - doneCount})` : `Faites (${doneCount})`}
               </button>
             ))}
           </div>
 
-          {filtered.length === 0 ? (
+          {filteredNormal.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">{filter === 'done' ? '🎉' : '📋'}</div>
               <p>{filter === 'done' ? 'Aucune tâche terminée' : 'Aucune tâche à faire'}</p>
             </div>
           ) : (
-            filtered.map(task => (
+            filteredNormal.map(task => (
               <div key={task.id} className={`task-item ${task.done === 1 ? 'done' : ''}`}>
                 <button
                   className={`task-checkbox ${task.done === 1 ? 'checked' : ''}`}
@@ -147,17 +196,37 @@ export default function Tasks() {
             ))
           )}
 
-          <div style={{ height: 80 }} />
+          <div style={{ height: 100 }} />
 
-          <form className="add-task-bar" onSubmit={handleAdd}>
-            <input
-              className="input"
-              placeholder="Nouvelle tâche..."
-              value={newTitle}
-              onChange={e => setNewTitle(e.target.value)}
-            />
-            <button type="submit" disabled={loading || !newTitle.trim()}>
-              {loading ? '...' : 'Ajouter'}
+          {/* Barre d'ajout */}
+          <form className="add-task-bar" onSubmit={handleAdd} style={{ flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                className="input"
+                placeholder="Nouvelle tâche..."
+                value={newTitle}
+                onChange={e => setNewTitle(e.target.value)}
+                style={{ marginBottom: 0, flex: 1 }}
+              />
+              <button type="submit" disabled={loading || !newTitle.trim()}>
+                {loading ? '...' : 'Ajouter'}
+              </button>
+            </div>
+            {/* Toggle quotidien */}
+            <button
+              type="button"
+              onClick={() => setIsDaily(d => !d)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '8px 12px', borderRadius: 10,
+                border: `2px solid ${isDaily ? '#6366F1' : 'var(--border)'}`,
+                background: isDaily ? '#EEF2FF' : 'var(--surface)',
+                color: isDaily ? '#4338CA' : 'var(--text-2)',
+                fontWeight: 600, fontSize: 13, cursor: 'pointer',
+              }}
+            >
+              <span style={{ fontSize: 16 }}>🔄</span>
+              {isDaily ? 'Tâche quotidienne activée — se réinitialise à minuit' : 'Rendre quotidienne'}
             </button>
           </form>
         </>

@@ -137,6 +137,8 @@ async function init() {
   try { await db.execute("ALTER TABLE messages ADD COLUMN audio TEXT DEFAULT ''"); } catch (e) {}
   try { await db.execute("ALTER TABLE expenses ADD COLUMN member_ids TEXT DEFAULT ''"); } catch (e) {}
   try { await db.execute("ALTER TABLE members ADD COLUMN location_token TEXT DEFAULT ''"); } catch (e) {}
+  try { await db.execute("ALTER TABLE tasks ADD COLUMN recurrence TEXT DEFAULT 'none'"); } catch (e) {}
+  try { await db.execute("ALTER TABLE tasks ADD COLUMN done_date TEXT DEFAULT ''"); } catch (e) {}
 
   const res = await db.execute('SELECT id FROM admins WHERE username = ?', ['admin']);
   if (res.rows.length === 0) {
