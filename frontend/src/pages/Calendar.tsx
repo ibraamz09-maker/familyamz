@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../api';
 import { CalendarEvent, Member, MONTHS_FR } from '../types';
 import Modal from '../components/Modal';
@@ -38,6 +38,17 @@ export default function Calendar() {
   const [calView, setCalView] = useState<'day' | 'week'>('day');
   const [viewDate, setViewDate] = useState(new Date(today));
   const [weekEvents, setWeekEvents] = useState<CalendarEvent[]>([]);
+  const savedScrollY = useRef<number>(0);
+
+  const navigateWeek = (dir: -1 | 1) => {
+    savedScrollY.current = window.scrollY;
+    setViewDate(d => addDays(d, dir * 7));
+  };
+
+  const navigateDay = (dir: -1 | 1) => {
+    savedScrollY.current = window.scrollY;
+    setViewDate(d => addDays(d, dir));
+  };
 
   // Charger les membres séparément (indépendamment des events)
   useEffect(() => {
@@ -62,7 +73,15 @@ export default function Calendar() {
     } catch { /* ignore */ }
   }, [viewDate]);
 
-  useEffect(() => { fetchWeekData(); }, [fetchWeekData]);
+  useEffect(() => {
+    fetchWeekData().then(() => {
+      if (savedScrollY.current > 0) {
+        requestAnimationFrame(() => {
+          window.scrollTo({ top: savedScrollY.current, behavior: 'instant' });
+        });
+      }
+    });
+  }, [fetchWeekData]);
 
   const prevMonth = () => { if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1); };
   const nextMonth = () => { if (month === 11) { setMonth(0); setYear(y => y + 1); } else setMonth(m => m + 1); };
@@ -214,11 +233,11 @@ export default function Calendar() {
       {calView === 'day' && (
         <div className="cal-day-view">
           <div className="month-nav">
-            <button className="nav-btn" onClick={() => setViewDate(d => addDays(d, -1))}>‹</button>
+            <button className="nav-btn" onClick={() => navigateDay(-1)}>‹</button>
             <span style={{ fontWeight: 700, fontSize: 15 }}>
               {DAYS_FULL[(viewDate.getDay() + 6) % 7]} {viewDate.getDate()} {MONTHS_FR[viewDate.getMonth()]}
             </span>
-            <button className="nav-btn" onClick={() => setViewDate(d => addDays(d, 1))}>›</button>
+            <button className="nav-btn" onClick={() => navigateDay(1)}>›</button>
           </div>
 
           {allDayEvts.length > 0 && (
@@ -266,11 +285,11 @@ export default function Calendar() {
         <div className="cal-week-view">
           {/* Navigation semaine */}
           <div className="month-nav">
-            <button className="nav-btn" onClick={() => setViewDate(d => addDays(d, -7))}>‹</button>
+            <button className="nav-btn" onClick={() => navigateWeek(-1)}>‹</button>
             <span style={{ fontWeight: 700, fontSize: 14 }}>
               {monday.getDate()} {MONTHS_FR[monday.getMonth()]} — {addDays(monday, 6).getDate()} {MONTHS_FR[addDays(monday, 6).getMonth()]} {monday.getFullYear()}
             </span>
-            <button className="nav-btn" onClick={() => setViewDate(d => addDays(d, 7))}>›</button>
+            <button className="nav-btn" onClick={() => navigateWeek(1)}>›</button>
           </div>
 
           {/* Bande 7 jours cliquables */}
