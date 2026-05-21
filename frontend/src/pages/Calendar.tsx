@@ -261,9 +261,10 @@ export default function Calendar() {
         </div>
       )}
 
-      {/* Week view */}
+      {/* Week view — style Google Agenda */}
       {calView === 'week' && (
         <div className="cal-week-view">
+          {/* Navigation semaine */}
           <div className="month-nav">
             <button className="nav-btn" onClick={() => setViewDate(d => addDays(d, -7))}>‹</button>
             <span style={{ fontWeight: 700, fontSize: 14 }}>
@@ -271,28 +272,102 @@ export default function Calendar() {
             </span>
             <button className="nav-btn" onClick={() => setViewDate(d => addDays(d, 7))}>›</button>
           </div>
-          <div className="cal-week-grid">
+
+          {/* Bande 7 jours cliquables */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, gap: 4 }}>
             {weekDays.map((d, i) => {
               const ds = dateToStr(d);
-              const de = weekEvents.filter(e => e.date === ds);
+              const hasEvents = weekEvents.some(e => e.date === ds);
               const isToday = ds === todayStr;
+              const isSelected = dateToStr(viewDate) === ds;
               return (
-                <div key={i} className={`cal-week-col${isToday ? ' today-col' : ''}`}>
-                  <div className="cal-week-day-header">
-                    <div className="cal-week-day-name">{DAYS_FR[i]}</div>
-                    <div className={`cal-week-day-num${isToday ? ' today-num' : ''}`}>{d.getDate()}</div>
+                <button
+                  key={i}
+                  onClick={() => setViewDate(d)}
+                  style={{
+                    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                    gap: 2, padding: '6px 0', borderRadius: 12, border: 'none', cursor: 'pointer',
+                    background: isSelected ? 'var(--primary)' : isToday ? 'var(--primary-light, #EEF2FF)' : 'transparent',
+                    color: isSelected ? 'white' : isToday ? 'var(--primary)' : 'var(--text-2)',
+                  }}
+                >
+                  <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase' }}>{DAYS_FR[i]}</span>
+                  <span style={{ fontSize: 16, fontWeight: 700 }}>{d.getDate()}</span>
+                  <span style={{
+                    width: 5, height: 5, borderRadius: '50%',
+                    background: hasEvents ? (isSelected ? 'white' : 'var(--primary)') : 'transparent',
+                  }} />
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Agenda liste pour la semaine */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {weekDays.map((d, i) => {
+              const ds = dateToStr(d);
+              const de = weekEvents
+                .filter(e => e.date === ds)
+                .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+              const isToday = ds === todayStr;
+              if (de.length === 0) return null;
+              return (
+                <div key={i} style={{ marginBottom: 12 }}>
+                  {/* En-tête du jour */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6,
+                  }}>
+                    <div style={{
+                      width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                      background: isToday ? 'var(--primary)' : 'var(--surface)',
+                      border: `2px solid ${isToday ? 'var(--primary)' : 'var(--border)'}`,
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                      color: isToday ? 'white' : 'var(--text-1)',
+                    }}>
+                      <span style={{ fontSize: 9, fontWeight: 700, lineHeight: 1 }}>{DAYS_FR[i]}</span>
+                      <span style={{ fontSize: 14, fontWeight: 800, lineHeight: 1 }}>{d.getDate()}</span>
+                    </div>
+                    <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
                   </div>
-                  <div className="cal-week-events">
+
+                  {/* Événements du jour */}
+                  <div style={{ paddingLeft: 46, display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {de.map(ev => (
-                      <div key={ev.id} className="cal-week-event" style={{ backgroundColor: ev.member_color || '#9CA3AF', cursor: 'pointer' }} onClick={() => setDetailEvent(ev)}>
-                        {ev.time && <span className="cal-week-time">{ev.time}{(ev as any).end_time ? `→${(ev as any).end_time}` : ''} </span>}
-                        <span className="cal-week-title">{ev.title}</span>
+                      <div
+                        key={ev.id}
+                        onClick={() => setDetailEvent(ev)}
+                        style={{
+                          display: 'flex', alignItems: 'flex-start', gap: 10,
+                          padding: '10px 12px', borderRadius: 12, cursor: 'pointer',
+                          background: (ev.member_color || '#9CA3AF') + '22',
+                          borderLeft: `4px solid ${ev.urgent ? '#EF4444' : (ev.member_color || '#9CA3AF')}`,
+                        }}
+                      >
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {ev.urgent ? '🚨 ' : ''}{ev.title}
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            {ev.time && (
+                              <span>🕐 {ev.time}{(ev as any).end_time ? ` → ${(ev as any).end_time}` : ''}</span>
+                            )}
+                            <span>👤 {getMembersLabel(ev)}</span>
+                          </div>
+                          {ev.description ? <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>{ev.description}</div> : null}
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
               );
             })}
+
+            {weekEvents.length === 0 && (
+              <div className="empty-state" style={{ padding: '24px 0' }}>
+                <div className="empty-state-icon">📭</div>
+                <p>Aucun événement cette semaine</p>
+              </div>
+            )}
           </div>
         </div>
       )}
