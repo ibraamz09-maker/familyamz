@@ -13,7 +13,8 @@ router.post('/analyze', authMiddleware, async (req, res) => {
     const { text } = req.body;
     if (!text) return res.status(400).json({ error: 'Texte requis' });
 
-    const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+    // Clé dédiée à l'assistant vocal, sinon fallback sur la clé générale
+    const apiKey = (process.env.GEMINI_API_KEY_ASSISTANT || process.env.GEMINI_API_KEY || '').trim();
     if (!apiKey) return res.status(400).json({ error: 'Clé Gemini non configurée' });
 
     const today = todayStr();
