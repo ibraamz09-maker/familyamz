@@ -24,6 +24,7 @@ export default function AssistantModal({ onClose, members, onDone }: Props) {
   const [editData, setEditData] = useState<Record<string, unknown>>({});
   const [error, setError] = useState('');
   const recogRef = useRef<any>(null);
+  const transcriptRef = useRef('');
 
   // Nettoyage au démontage
   useEffect(() => () => { recogRef.current?.stop(); }, []);
@@ -44,10 +45,12 @@ export default function AssistantModal({ onClose, members, onDone }: Props) {
     recog.onresult = (e: any) => {
       const t = Array.from(e.results).map((r: any) => r[0].transcript).join('');
       setTranscript(t);
+      transcriptRef.current = t; // toujours à jour, même dans les closures
     };
     recog.onend = () => {
       setListening(false);
-      if (transcript.trim()) analyze(transcript.trim());
+      const final = transcriptRef.current.trim();
+      if (final) analyze(final);
     };
     recog.onerror = () => { setListening(false); };
 
@@ -55,6 +58,7 @@ export default function AssistantModal({ onClose, members, onDone }: Props) {
     recogRef.current = recog;
     setListening(true);
     setTranscript('');
+    transcriptRef.current = '';
   };
 
   const stopListening = () => {
