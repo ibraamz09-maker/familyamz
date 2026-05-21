@@ -43,25 +43,40 @@ Règles:
 - Si le montant n'est pas clair pour une dépense, mets 0
 - Sois précis sur la catégorie de dépense selon le contexte`;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 500 },
-        }),
-      }
-    );
+    // Essayer plusieurs modèles en cascade
+    const MODELS = [
+      { model: 'gemini-1.5-flash-8b', version: 'v1beta' },
+      { model: 'gemini-1.5-flash-8b', version: 'v1' },
+      { model: 'gemini-1.5-flash',    version: 'v1' },
+      { model: 'gemini-2.0-flash-lite', version: 'v1beta' },
+      { model: 'gemini-2.0-flash',    version: 'v1beta' },
+    ];
 
-    if (!response.ok) {
+    let raw = '';
+    let lastError = '';
+    for (const { model, version } of MODELS) {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`.replace('v1beta/models', `${version}/models`),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 500 },
+          }),
+        }
+      );
+      if (response.ok) {
+        const json = await response.json();
+        raw = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        break;
+      }
       const err = await response.json().catch(() => ({}));
-      return res.status(500).json({ error: `Gemini error ${response.status}: ${err?.error?.message || 'inconnu'}` });
+      lastError = `Gemini error ${response.status} (${model}): ${err?.error?.message || 'inconnu'}`;
+      console.warn(`[Assistant] ${lastError}`);
     }
 
-    const json = await response.json();
-    const raw = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    if (!raw) return res.status(500).json({ error: lastError || 'Tous les modèles Gemini ont échoué' });
 
     // Extraire le JSON de la réponse
     const match = raw.match(/\{[\s\S]*\}/);
