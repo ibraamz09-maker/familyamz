@@ -50,6 +50,7 @@ const TAB_TITLES: Record<Tab, string> = {
   settings: 'Réglages',
 };
 
+
 export default function App() {
   const { family, isAdmin, member } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('calendar');

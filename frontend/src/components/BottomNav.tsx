@@ -11,7 +11,6 @@ const tabs: { id: Tab; icon: string; label: string }[] = [
   { id: 'expenses', icon: '💶', label: 'Dépenses' },
   { id: 'messages', icon: '💬', label: 'Chat' },
   { id: 'map', icon: '🗺️', label: 'Carte' },
-  { id: 'members', icon: '👥', label: 'Membres' },
   { id: 'settings', icon: '⚙️', label: 'Réglages' },
 ];
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../api';
+import Members from './Members';
 
 
 type Theme = 'light' | 'dark' | 'rose' | 'blue';
@@ -309,6 +310,12 @@ export default function Settings() {
             Télécharge d'abord le ZIP avant de supprimer
           </div>
         )}
+      </div>
+
+      {/* Membres */}
+      <p className="section-title">👥 Membres de la famille</p>
+      <div className="card" style={{ marginBottom: 20 }}>
+        <Members />
       </div>
 
       {/* Déconnexion */}
