@@ -21,6 +21,7 @@ app.use('/api/messages', require('./routes/messages'));
 app.use('/api/push', require('./routes/push'));
 app.use('/api/location', require('./routes/location'));
 app.use('/api/owntracks', require('./routes/owntracks'));
+app.use('/api/assistant', require('./routes/assistant'));
 
 // Diagnostic connexion base de données
 app.get('/api/health', async (req, res) => {

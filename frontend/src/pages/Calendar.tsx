@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../api';
 import { CalendarEvent, Member, MONTHS_FR } from '../types';
 import Modal from '../components/Modal';
+import AssistantModal from '../components/AssistantModal';
 
 const DAYS_FR = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 const DAYS_FULL = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
@@ -38,6 +39,7 @@ export default function Calendar() {
   const [calView, setCalView] = useState<'day' | 'week'>('day');
   const [viewDate, setViewDate] = useState(new Date(today));
   const [weekEvents, setWeekEvents] = useState<CalendarEvent[]>([]);
+  const [showAssistant, setShowAssistant] = useState(false);
   const savedScrollY = useRef<number>(0);
 
   const navigateWeek = (dir: -1 | 1) => {
@@ -195,6 +197,28 @@ export default function Calendar() {
 
   return (
     <div>
+      {/* Bouton assistant IA */}
+      <button
+        onClick={() => setShowAssistant(true)}
+        title="Assistant vocal IA"
+        style={{
+          position: 'fixed', top: 16, right: 16, zIndex: 100,
+          width: 44, height: 44, borderRadius: '50%', border: 'none',
+          background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+          color: 'white', fontSize: 20, cursor: 'pointer',
+          boxShadow: '0 4px 14px rgba(99,102,241,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >🤖</button>
+
+      {showAssistant && (
+        <AssistantModal
+          members={members}
+          onClose={() => setShowAssistant(false)}
+          onDone={() => { fetchMonthData(); fetchWeekData(); }}
+        />
+      )}
+
       {/* Monthly calendar */}
       <div className="calendar-nav">
         <button className="nav-btn" onClick={prevMonth}>‹</button>

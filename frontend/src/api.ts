@@ -113,4 +113,5 @@ export const api = {
   exportReceiptsYear: (year: number) => `/api/receipts/export/${year}?token=${getToken()}`,
   deleteReceiptsYear: (year: number) => req<{ ok: boolean; deleted: number }>('DELETE', `/receipts/year/${year}`),
   getLocationToken: () => req<{ token: string }>('GET', '/location/token'),
+  analyzeVoice: (text: string) => req<{ action: string; summary: string; data: Record<string, unknown> }>('POST', '/assistant/analyze', { text }),
 };
