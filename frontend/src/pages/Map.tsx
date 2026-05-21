@@ -118,7 +118,7 @@ export default function MapPage() {
         popupAnchor: [0, -22],
       });
       const locationTime = m.location_at
-        ? new Date(m.location_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+        ? new Date(m.location_at.includes('Z') || m.location_at.includes('+') ? m.location_at : m.location_at.replace(' ', 'T') + 'Z').toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
         : '';
       const marker = L.marker([m.lat!, m.lng!], { icon })
         .addTo(map)
@@ -396,7 +396,7 @@ export default function MapPage() {
               <div style={{ fontWeight: 700, fontSize: 15 }}>{m.name}</div>
               <div style={{ fontSize: 12, color: 'var(--text-2)' }}>
                 {m.lat != null
-                  ? `📍 ${m.location_at ? new Date(m.location_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : 'localisé'} · Appuie pour centrer`
+                  ? `📍 ${m.location_at ? new Date(m.location_at.includes('Z') || m.location_at.includes('+') ? m.location_at : m.location_at.replace(' ', 'T') + 'Z').toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : 'localisé'} · Appuie pour centrer`
                   : '⚪ Position non partagée'}
               </div>
             </div>
