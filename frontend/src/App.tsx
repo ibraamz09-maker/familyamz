@@ -12,6 +12,31 @@ import MapPage from './pages/Map';
 import Settings, { applyTheme, applyFontSize } from './pages/Settings';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
+import AssistantModal from './components/AssistantModal';
+
+function CalendarAssistantBtn() {
+  const [show, setShow] = useState(false);
+  const [members, setMembers] = useState<{ id: number; name: string; color: string }[]>([]);
+  useEffect(() => {
+    api.getMembers().then((d: unknown) => setMembers(d as { id: number; name: string; color: string }[])).catch(() => {});
+  }, []);
+  return (
+    <>
+      <button
+        onClick={() => setShow(true)}
+        title="Assistant vocal IA"
+        style={{
+          width: 40, height: 40, borderRadius: '50%', border: 'none',
+          background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+          color: 'white', fontSize: 20, cursor: 'pointer',
+          boxShadow: '0 3px 10px rgba(99,102,241,0.45)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        }}
+      >🤖</button>
+      {show && <AssistantModal members={members} onClose={() => setShow(false)} onDone={() => {}} />}
+    </>
+  );
+}
 
 type Tab = 'calendar' | 'tasks' | 'expenses' | 'messages' | 'map' | 'members' | 'settings';
 
@@ -79,9 +104,12 @@ export default function App() {
     <div className="app">
       <Header />
       <main className="main-content">
-        <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: 'var(--text)' }}>
-          {TAB_TITLES[activeTab]}
-        </h1>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', margin: 0 }}>
+            {TAB_TITLES[activeTab]}
+          </h1>
+          {activeTab === 'calendar' && <CalendarAssistantBtn />}
+        </div>
         {activeTab === 'calendar' && <Calendar />}
         {activeTab === 'tasks' && <Tasks />}
         {activeTab === 'expenses' && <Expenses />}
