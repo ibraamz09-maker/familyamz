@@ -45,15 +45,15 @@ router.get('/', authMiddleware, async (req, res) => {
 
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { title, date, time, member_id, member_ids, description, urgent, recurrence } = req.body;
+    const { title, date, time, end_time, member_id, member_ids, description, urgent, recurrence } = req.body;
     if (!title || !date) return res.status(400).json({ error: 'Titre et date requis' });
     const memberIdsJson = member_ids && member_ids.length > 0 ? JSON.stringify(member_ids) : '';
     const isUrgent = urgent ? 1 : 0;
     const rec = recurrence || 'none';
 
     const result = await db.execute(
-      'INSERT INTO events (family_id, member_id, title, date, time, description, member_ids, urgent, recurrence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [req.user.familyId, member_id || null, title, date, time || '', description || '', memberIdsJson, isUrgent, rec]
+      'INSERT INTO events (family_id, member_id, title, date, time, end_time, description, member_ids, urgent, recurrence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [req.user.familyId, member_id || null, title, date, time || '', end_time || '', description || '', memberIdsJson, isUrgent, rec]
     );
     const firstId = Number(result.lastInsertRowid);
 
@@ -65,8 +65,8 @@ router.post('/', authMiddleware, async (req, res) => {
         d.setDate(baseDate.getDate() + i * 7);
         const ds = d.toISOString().split('T')[0];
         await db.execute(
-          'INSERT INTO events (family_id, member_id, title, date, time, description, member_ids, urgent, recurrence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [req.user.familyId, member_id || null, title, ds, time || '', description || '', memberIdsJson, 0, 'weekly']
+          'INSERT INTO events (family_id, member_id, title, date, time, end_time, description, member_ids, urgent, recurrence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [req.user.familyId, member_id || null, title, ds, time || '', end_time || '', description || '', memberIdsJson, 0, 'weekly']
         ).catch(() => {});
       }
     } else if (rec === 'monthly') {
@@ -76,8 +76,8 @@ router.post('/', authMiddleware, async (req, res) => {
         d.setMonth(baseDate.getMonth() + i);
         const ds = d.toISOString().split('T')[0];
         await db.execute(
-          'INSERT INTO events (family_id, member_id, title, date, time, description, member_ids, urgent, recurrence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [req.user.familyId, member_id || null, title, ds, time || '', description || '', memberIdsJson, 0, 'monthly']
+          'INSERT INTO events (family_id, member_id, title, date, time, end_time, description, member_ids, urgent, recurrence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [req.user.familyId, member_id || null, title, ds, time || '', end_time || '', description || '', memberIdsJson, 0, 'monthly']
         ).catch(() => {});
       }
     }
@@ -98,13 +98,13 @@ router.post('/', authMiddleware, async (req, res) => {
 
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
-    const { title, date, time, member_id, member_ids, description, urgent, recurrence } = req.body;
+    const { title, date, time, end_time, member_id, member_ids, description, urgent, recurrence } = req.body;
     const memberIdsJson = member_ids && member_ids.length > 0 ? JSON.stringify(member_ids) : '';
     const isUrgent = urgent ? 1 : 0;
     const rec = recurrence || 'none';
     await db.execute(
-      'UPDATE events SET title = ?, date = ?, time = ?, member_id = ?, description = ?, member_ids = ?, urgent = ?, recurrence = ? WHERE id = ? AND family_id = ?',
-      [title, date, time || '', member_id || null, description || '', memberIdsJson, isUrgent, rec, req.params.id, req.user.familyId]
+      'UPDATE events SET title = ?, date = ?, time = ?, end_time = ?, member_id = ?, description = ?, member_ids = ?, urgent = ?, recurrence = ? WHERE id = ? AND family_id = ?',
+      [title, date, time || '', end_time || '', member_id || null, description || '', memberIdsJson, isUrgent, rec, req.params.id, req.user.familyId]
     );
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }

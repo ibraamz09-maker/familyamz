@@ -32,7 +32,7 @@ export default function Calendar() {
   const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [detailEvent, setDetailEvent] = useState<CalendarEvent | null>(null);
-  const [form, setForm] = useState({ title: '', description: '', member_ids: [] as number[], time: '', urgent: false, recurrence: 'none' });
+  const [form, setForm] = useState({ title: '', description: '', member_ids: [] as number[], time: '', end_time: '', urgent: false, recurrence: 'none' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [calView, setCalView] = useState<'day' | 'week'>('day');
@@ -83,7 +83,7 @@ export default function Calendar() {
     setEditingEvent(null);
     setDetailEvent(null);
     setError('');
-    setForm({ title: '', description: '', member_ids: [], time: '', urgent: false, recurrence: 'none' });
+    setForm({ title: '', description: '', member_ids: [], time: '', end_time: '', urgent: false, recurrence: 'none' });
     setShowModal(true);
   };
 
@@ -93,7 +93,7 @@ export default function Calendar() {
     setError('');
     let ids: number[] = [];
     try { if (ev.member_ids) ids = JSON.parse(ev.member_ids); } catch {}
-    setForm({ title: ev.title, description: ev.description, member_ids: ids, time: ev.time || '', urgent: !!(ev.urgent), recurrence: ev.recurrence || 'none' });
+    setForm({ title: ev.title, description: ev.description, member_ids: ids, time: ev.time || '', end_time: (ev as any).end_time || '', urgent: !!(ev.urgent), recurrence: ev.recurrence || 'none' });
   };
 
   const toggleMember = (id: number) => {
@@ -119,6 +119,7 @@ export default function Calendar() {
         member_ids: form.member_ids,
         date: editingEvent ? editingEvent.date : toDateStr(year, month, selectedDay!),
         time: form.time || '',
+        end_time: form.end_time || '',
         urgent: form.urgent,
         recurrence: form.recurrence,
       };
@@ -132,7 +133,7 @@ export default function Calendar() {
         await api.createEvent(data);
         await fetchMonthData();
         await fetchWeekData();
-        setForm({ title: '', description: '', member_ids: [], time: '', urgent: false, recurrence: 'none' });
+        setForm({ title: '', description: '', member_ids: [], time: '', end_time: '', urgent: false, recurrence: 'none' });
         setEditingEvent(null);
         setShowModal(false);
       }
@@ -241,7 +242,7 @@ export default function Calendar() {
                 <div className="cal-hour-content">
                   {slotEvts.map(ev => (
                     <div key={ev.id} className="cal-day-event" style={{ borderLeftColor: ev.urgent ? '#EF4444' : (ev.member_color || '#9CA3AF'), cursor: 'pointer' }} onClick={() => setDetailEvent(ev)}>
-                      <span className="cal-event-time">{ev.time}</span>
+                      <span className="cal-event-time">{ev.time}{(ev as any).end_time ? ` → ${(ev as any).end_time}` : ''}</span>
                       <span className="cal-event-title"> {ev.urgent ? '🚨 ' : ''}{ev.title}</span>
                       <span className="cal-event-member"> · {getMembersLabel(ev)}</span>
                     </div>
@@ -284,7 +285,7 @@ export default function Calendar() {
                   <div className="cal-week-events">
                     {de.map(ev => (
                       <div key={ev.id} className="cal-week-event" style={{ backgroundColor: ev.member_color || '#9CA3AF', cursor: 'pointer' }} onClick={() => setDetailEvent(ev)}>
-                        {ev.time && <span className="cal-week-time">{ev.time} </span>}
+                        {ev.time && <span className="cal-week-time">{ev.time}{(ev as any).end_time ? `→${(ev as any).end_time}` : ''} </span>}
                         <span className="cal-week-title">{ev.title}</span>
                       </div>
                     ))}
@@ -303,7 +304,11 @@ export default function Calendar() {
             {detailEvent.time && (
               <div className="detail-row">
                 <span className="detail-icon">🕐</span>
-                <span>{detailEvent.time} · {detailEvent.date}</span>
+                <span>
+                  {detailEvent.time}
+                  {(detailEvent as any).end_time ? ` → ${(detailEvent as any).end_time}` : ''}
+                  {' · '}{detailEvent.date}
+                </span>
               </div>
             )}
             {!detailEvent.time && (
@@ -352,7 +357,7 @@ export default function Calendar() {
               {eventsForDayNum(selectedDay).map(ev => (
                 <div key={ev.id} className="event-item" style={{ borderLeftColor: ev.urgent ? '#EF4444' : (ev.member_color || '#9CA3AF'), cursor: 'pointer' }} onClick={() => setDetailEvent(ev)}>
                   <div className="event-item-content">
-                    {ev.time && <span className="event-time-badge">{ev.time}</span>}
+                    {ev.time && <span className="event-time-badge">{ev.time}{(ev as any).end_time ? ` → ${(ev as any).end_time}` : ''}</span>}
                     {ev.urgent ? <strong>🚨 {ev.title}</strong> : <strong>{ev.title}</strong>}
                     {ev.recurrence && ev.recurrence !== 'none' && <span className="recurrence-badge">🔁 {ev.recurrence === 'weekly' ? 'Hebdo' : 'Mensuel'}</span>}
                     <span className="event-member"> · {getMembersLabel(ev)}</span>
@@ -372,8 +377,14 @@ export default function Calendar() {
             {error && <div className="error-banner" style={{ marginBottom: 10 }}>{error}</div>}
             <label className="form-label">Titre *</label>
             <input className="input" placeholder="Titre de l'événement" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
-            <label className="form-label">Heure (optionnel)</label>
-            <input className="input" type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} />
+            <label className="form-label">Heure de début (optionnel)</label>
+            <input className="input" type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value, end_time: '' }))} />
+            {form.time && (
+              <>
+                <label className="form-label">Heure de fin (optionnel)</label>
+                <input className="input" type="time" value={form.end_time} onChange={e => setForm(f => ({ ...f, end_time: e.target.value }))} min={form.time} />
+              </>
+            )}
             <label className="form-label">Qui est concerné ?</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
               <button
@@ -441,7 +452,7 @@ export default function Calendar() {
                 {loading ? 'Enregistrement...' : editingEvent ? '✓ Modifier' : '✓ Ajouter'}
               </button>
               {editingEvent && (
-                <button className="btn-secondary" style={{ width: '100%', marginTop: 8 }} onClick={() => { setEditingEvent(null); setForm({ title: '', description: '', member_ids: [], time: '', urgent: false, recurrence: 'none' }); }}>
+                <button className="btn-secondary" style={{ width: '100%', marginTop: 8 }} onClick={() => { setEditingEvent(null); setForm({ title: '', description: '', member_ids: [], time: '', end_time: '', urgent: false, recurrence: 'none' }); }}>
                   Annuler
                 </button>
               )}
