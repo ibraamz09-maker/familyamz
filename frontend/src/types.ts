@@ -84,6 +84,16 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   'Courses', 'Restauration', 'Loisirs', 'Vêtements', 'Santé', 'Abonnements', 'Électricité', 'Essence', 'Autres',
 ];
 
+export const ACCOUNTS = ['La Banque Postale', 'Revolut', 'BNP Paribas', 'Non placé'] as const;
+export type Account = typeof ACCOUNTS[number];
+
+export const ACCOUNT_COLORS: Record<string, string> = {
+  'La Banque Postale': '#FFD700',
+  'Revolut': '#191C1F',
+  'BNP Paribas': '#00A94F',
+  'Non placé': '#9CA3AF',
+};
+
 export const MONTHS_FR = [
   'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
   'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',

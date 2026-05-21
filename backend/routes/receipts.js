@@ -248,22 +248,24 @@ router.get('/:id/file', authMiddleware, async (req, res) => {
 
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { filename, mimetype, data, amount, date, category, description, member_id } = req.body;
+    const { filename, mimetype, data, amount, date, category, description, member_id, account } = req.body;
     if (!filename || !mimetype || !data || !date || !category) {
       return res.status(400).json({ error: 'Champs manquants' });
     }
+    const validCategories = ['Courses', 'Restauration', 'Loisirs', 'Vêtements', 'Santé', 'Abonnements', 'Électricité', 'Essence', 'Autres'];
+    const safeCategory = validCategories.includes(category) ? category : 'Autres';
     let expenseId = null;
     if (amount && parseFloat(amount) > 0) {
       const desc = description ? `📎 ${description}` : `📎 Ticket`;
       const expResult = await db.execute({
-        sql: `INSERT INTO expenses (family_id, member_id, amount, date, category, description) VALUES (?, ?, ?, ?, ?, ?)`,
-        args: [req.user.familyId, member_id || null, parseFloat(amount), date, category, desc]
+        sql: `INSERT INTO expenses (family_id, member_id, amount, date, category, description, account) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        args: [req.user.familyId, member_id || null, parseFloat(amount), date, safeCategory, desc, account || 'Non placé']
       });
       expenseId = Number(expResult.lastInsertRowid);
     }
     const result = await db.execute({
-      sql: `INSERT INTO receipts (family_id, filename, mimetype, data, amount, date, category, description, member_id, expense_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [req.user.familyId, filename, mimetype, data, amount || null, date, category, description || '', member_id || null, expenseId]
+      sql: `INSERT INTO receipts (family_id, filename, mimetype, data, amount, date, category, description, member_id, expense_id, account) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [req.user.familyId, filename, mimetype, data, amount || null, date, safeCategory, description || '', member_id || null, expenseId, account || '']
     });
     res.json({ id: Number(result.lastInsertRowid), expense_id: expenseId });
   } catch (e) { res.status(500).json({ error: e.message }); }

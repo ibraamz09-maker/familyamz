@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
 } from 'recharts';
 import { api } from '../api';
-import { Expense, Receipt, Member, EXPENSE_CATEGORIES, CATEGORY_COLORS, MONTHS_FR } from '../types';
+import { Expense, Receipt, Member, EXPENSE_CATEGORIES, CATEGORY_COLORS, MONTHS_FR, ACCOUNTS, ACCOUNT_COLORS } from '../types';
 import Modal from '../components/Modal';
 
 function fmt(n: number) { return n.toFixed(2).replace('.', ',') + ' €'; }
@@ -81,6 +82,7 @@ export default function Expenses() {
     category: EXPENSE_CATEGORIES[0],
     member_ids: [] as number[],
     description: '',
+    account: '' as string,
   });
   const [loading, setLoading] = useState(false);
 
@@ -135,13 +137,7 @@ export default function Expenses() {
 
   const openAdd = () => {
     setEditingExpense(null);
-    setForm({
-      amount: '',
-      date: today.toISOString().slice(0, 10),
-      category: EXPENSE_CATEGORIES[0],
-      member_ids: [],
-      description: '',
-    });
+    setForm({ amount: '', date: today.toISOString().slice(0, 10), category: EXPENSE_CATEGORIES[0], member_ids: [], description: '', account: '' });
     setShowModal(true);
   };
 
@@ -149,13 +145,7 @@ export default function Expenses() {
     setEditingExpense(ex);
     let ids: number[] = [];
     try { if (ex.member_ids) ids = JSON.parse(ex.member_ids).map(Number); } catch {}
-    setForm({
-      amount: String(ex.amount),
-      date: ex.date,
-      category: ex.category as import('../types').ExpenseCategory,
-      member_ids: ids,
-      description: ex.description,
-    });
+    setForm({ amount: String(ex.amount), date: ex.date, category: ex.category as import('../types').ExpenseCategory, member_ids: ids, description: ex.description, account: (ex as any).account || '' });
     setShowModal(true);
   };
 
@@ -182,6 +172,7 @@ export default function Expenses() {
         member_id: form.member_ids.length === 1 ? form.member_ids[0] : null,
         member_ids: form.member_ids,
         description: form.description,
+        account: form.account || 'Non placé',
       };
 
       const membersInfoOptimistic = form.member_ids
@@ -246,16 +237,28 @@ export default function Expenses() {
     total: expenses.filter(e => e.category === cat).reduce((s, e) => s + Number(e.amount), 0),
   })).filter(c => c.total > 0);
 
-  // Annual: chart data
+  // Annual: bar chart par mois (total)
   const chartData = MONTHS_FR.map((name, i) => {
     const mStr = `${year}-${String(i + 1).padStart(2, '0')}`;
     const mExp = expenses.filter(e => e.date.startsWith(mStr));
-    const entry: Record<string, string | number> = { month: name.slice(0, 3) };
-    EXPENSE_CATEGORIES.forEach(cat => {
-      entry[cat] = mExp.filter(e => e.category === cat).reduce((s, e) => s + Number(e.amount), 0);
-    });
-    return entry;
+    const total = mExp.reduce((s, e) => s + Number(e.amount), 0);
+    return { month: name.slice(0, 3), total };
   });
+
+  // Annual: donut par catégorie (les catégories inconnues → Autres)
+  const pieData = EXPENSE_CATEGORIES.map(cat => {
+    const val = expenses.filter(e => {
+      if (cat === 'Autres') return !EXPENSE_CATEGORIES.slice(0, -1).includes(e.category as any) || e.category === 'Autres';
+      return e.category === cat;
+    }).reduce((s, e) => s + Number(e.amount), 0);
+    return { name: cat, value: val };
+  }).filter(d => d.value > 0);
+
+  // Monthly: totaux par compte bancaire
+  const accountTotals = ACCOUNTS.map(acc => ({
+    acc,
+    total: expenses.filter(e => ((e as any).account || 'Non placé') === acc).reduce((s, e) => s + Number(e.amount), 0),
+  })).filter(a => a.total > 0);
 
   return (
     <div>
@@ -308,6 +311,26 @@ export default function Expenses() {
             </div>
           )}
 
+          {/* Totaux par compte bancaire */}
+          {accountTotals.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+              {accountTotals.map(({ acc, total: at }) => (
+                <div key={acc} style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '8px 14px', borderRadius: 12,
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  flex: '1 1 calc(50% - 4px)',
+                }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: ACCOUNT_COLORS[acc], flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-2)', fontWeight: 600 }}>{acc}</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-1)' }}>{fmt(at)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {expenses.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">💸</div>
@@ -317,11 +340,11 @@ export default function Expenses() {
             expenses.map(ex => (
               <div key={ex.id} className="expense-item">
                 <div className="expense-left">
-                  <span className="expense-cat-dot" style={{ backgroundColor: CATEGORY_COLORS[ex.category] }} />
+                  <span className="expense-cat-dot" style={{ backgroundColor: CATEGORY_COLORS[ex.category] || '#6B7280' }} />
                   <div className="expense-info">
                     <div className="expense-name">{ex.category}{ex.description ? ` — ${ex.description}` : ''}</div>
                     <div className="expense-meta">
-                      {ex.date}{getMembersLabel(ex) ? ` · ${getMembersLabel(ex)}` : ''}
+                      {ex.date}{(ex as any).account && (ex as any).account !== 'Non placé' ? ` · 🏦 ${(ex as any).account}` : ''}{getMembersLabel(ex) ? ` · ${getMembersLabel(ex)}` : ''}
                     </div>
                   </div>
                 </div>
@@ -336,27 +359,57 @@ export default function Expenses() {
         </>
       ) : view === 'annual' ? (
         <>
-          <div className="chart-container">
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={chartData} margin={{ top: 0, right: 8, left: -18, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E5EA" />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip formatter={(v: number) => fmt(v)} />
-                {EXPENSE_CATEGORIES.map(cat => (
-                  <Bar key={cat} dataKey={cat} stackId="a" fill={CATEGORY_COLORS[cat]} radius={cat === EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1] ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
+          {/* Donut par catégorie */}
+          {pieData.length > 0 ? (
+            <div className="chart-container">
+              <ResponsiveContainer width="100%" height={240}>
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={2}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    labelLine={false}
+                  >
+                    {pieData.map((entry) => (
+                      <Cell key={entry.name} fill={CATEGORY_COLORS[entry.name] || '#6B7280'} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v: number) => fmt(v)} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="chart-legend">
+                {pieData.map(d => (
+                  <div key={d.name} className="legend-item">
+                    <span className="legend-dot" style={{ backgroundColor: CATEGORY_COLORS[d.name] || '#6B7280' }} />
+                    {d.name} — {fmt(d.value)}
+                  </div>
                 ))}
-              </BarChart>
-            </ResponsiveContainer>
-            <div className="chart-legend">
-              {EXPENSE_CATEGORIES.map(cat => (
-                <div key={cat} className="legend-item">
-                  <span className="legend-dot" style={{ backgroundColor: CATEGORY_COLORS[cat] }} />
-                  {cat}
-                </div>
-              ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="empty-state"><div className="empty-state-icon">📊</div><p>Aucune dépense en {year}</p></div>
+          )}
+
+          {/* Barres mensuelles */}
+          {chartData.some(d => d.total > 0) && (
+            <div className="chart-container" style={{ marginTop: 12 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, color: 'var(--text-2)' }}>Évolution mensuelle</div>
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={chartData} margin={{ top: 0, right: 8, left: -18, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E5EA" />
+                  <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <Tooltip formatter={(v: number) => fmt(v)} />
+                  <Bar dataKey="total" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
 
           {/* Monthly breakdown for annual view */}
           {MONTHS_FR.map((name, i) => {
@@ -577,6 +630,19 @@ export default function Expenses() {
             <input className="input" type="number" step="0.01" min="0" placeholder="0,00" value={receiptForm.amount} onChange={e => setReceiptForm(f => ({ ...f, amount: e.target.value }))} />
             <label className="form-label">Description (optionnel)</label>
             <input className="input" placeholder="ex: Facture EDF, Amazon..." value={receiptForm.description} onChange={e => setReceiptForm(f => ({ ...f, description: e.target.value }))} />
+            <label className="form-label">Compte utilisé (optionnel)</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+              {ACCOUNTS.map(acc => {
+                const sel = (receiptForm as any).account === acc;
+                return (
+                  <button key={acc} type="button"
+                    onClick={() => setReceiptForm(f => ({ ...f, account: sel ? '' : acc }))}
+                    style={{ padding: '6px 14px', borderRadius: 20, fontWeight: 600, fontSize: 13, cursor: 'pointer', border: `2px solid ${sel ? ACCOUNT_COLORS[acc] : 'var(--border)'}`, background: sel ? ACCOUNT_COLORS[acc] : 'var(--surface)', color: sel ? (acc === 'Revolut' ? 'white' : (acc === 'BNP Paribas' ? 'white' : '#1a1a1a')) : 'var(--text)' }}>
+                    🏦 {acc}
+                  </button>
+                );
+              })}
+            </div>
             <label className="form-label">Qui est concerné ?</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
               <button type="button" onClick={() => setReceiptForm(f => ({ ...f, member_id: '' }))}
@@ -674,6 +740,19 @@ export default function Expenses() {
               value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
             />
+            <label className="form-label">Compte utilisé (optionnel)</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+              {ACCOUNTS.map(acc => {
+                const sel = form.account === acc;
+                return (
+                  <button key={acc} type="button"
+                    onClick={() => setForm(f => ({ ...f, account: sel ? '' : acc }))}
+                    style={{ padding: '6px 14px', borderRadius: 20, fontWeight: 600, fontSize: 13, cursor: 'pointer', border: `2px solid ${sel ? ACCOUNT_COLORS[acc] : 'var(--border)'}`, background: sel ? ACCOUNT_COLORS[acc] : 'var(--surface)', color: sel ? (acc === 'Revolut' ? 'white' : (acc === 'BNP Paribas' ? 'white' : '#1a1a1a')) : 'var(--text)' }}>
+                    🏦 {acc}
+                  </button>
+                );
+              })}
+            </div>
             <button className="btn-primary" type="submit" disabled={loading}>
               {loading ? '...' : editingExpense ? 'Modifier' : 'Ajouter'}
             </button>

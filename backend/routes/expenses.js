@@ -46,12 +46,12 @@ router.get('/', authMiddleware, async (req, res) => {
 
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { amount, date, category, member_id, member_ids, description } = req.body;
+    const { amount, date, category, member_id, member_ids, description, account } = req.body;
     if (!amount || !date || !category) return res.status(400).json({ error: 'Montant, date et catégorie requis' });
     const memberIdsJson = member_ids && member_ids.length > 0 ? JSON.stringify(member_ids) : '';
     const result = await db.execute(
-      'INSERT INTO expenses (family_id, member_id, amount, date, category, description, member_ids) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [req.user.familyId, member_id || null, amount, date, category, description || '', memberIdsJson]
+      'INSERT INTO expenses (family_id, member_id, amount, date, category, description, member_ids, account) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [req.user.familyId, member_id || null, amount, date, category, description || '', memberIdsJson, account || 'Non placé']
     );
     const senderName = req.user.memberName || 'Famille';
     notifyFamily(
@@ -65,11 +65,11 @@ router.post('/', authMiddleware, async (req, res) => {
 
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
-    const { amount, date, category, member_id, member_ids, description } = req.body;
+    const { amount, date, category, member_id, member_ids, description, account } = req.body;
     const memberIdsJson = member_ids && member_ids.length > 0 ? JSON.stringify(member_ids) : '';
     await db.execute(
-      'UPDATE expenses SET amount = ?, date = ?, category = ?, member_id = ?, description = ?, member_ids = ? WHERE id = ? AND family_id = ?',
-      [amount, date, category, member_id || null, description || '', memberIdsJson, req.params.id, req.user.familyId]
+      'UPDATE expenses SET amount = ?, date = ?, category = ?, member_id = ?, description = ?, member_ids = ?, account = ? WHERE id = ? AND family_id = ?',
+      [amount, date, category, member_id || null, description || '', memberIdsJson, account || 'Non placé', req.params.id, req.user.familyId]
     );
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
