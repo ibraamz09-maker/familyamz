@@ -40,13 +40,16 @@ export default function Calendar() {
   const [weekEvents, setWeekEvents] = useState<CalendarEvent[]>([]);
   const savedScrollY = useRef<number>(0);
 
+  const getScroller = () =>
+    document.querySelector<HTMLElement>('.main-content') || document.documentElement;
+
   const navigateWeek = (dir: -1 | 1) => {
-    savedScrollY.current = window.scrollY;
+    savedScrollY.current = getScroller().scrollTop;
     setViewDate(d => addDays(d, dir * 7));
   };
 
   const navigateDay = (dir: -1 | 1) => {
-    savedScrollY.current = window.scrollY;
+    savedScrollY.current = getScroller().scrollTop;
     setViewDate(d => addDays(d, dir));
   };
 
@@ -77,7 +80,9 @@ export default function Calendar() {
     fetchWeekData().then(() => {
       if (savedScrollY.current > 0) {
         requestAnimationFrame(() => {
-          window.scrollTo({ top: savedScrollY.current, behavior: 'instant' });
+          requestAnimationFrame(() => {
+            getScroller().scrollTop = savedScrollY.current;
+          });
         });
       }
     });
