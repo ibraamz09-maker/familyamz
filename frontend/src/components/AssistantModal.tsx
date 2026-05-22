@@ -95,7 +95,9 @@ export default function AssistantModal({ onClose, members, onDone }: Props) {
           end_time: String(d.end_time || ''),
           description: String(d.description || ''),
           member_ids: memberIds,
-        });
+          recurrence: d.recurrence && d.recurrence !== 'none' ? String(d.recurrence) : undefined,
+          recurrence_count: d.recurrence_count ? Number(d.recurrence_count) : undefined,
+        } as any);
       } else if (result.action === 'add_task') {
         await api.createTask(String(d.title || ''), d.recurrence === 'daily' ? 'daily' : 'none');
       } else if (result.action === 'add_expense') {
@@ -226,6 +228,41 @@ export default function AssistantModal({ onClose, members, onDone }: Props) {
                     </div>
                     <div><label style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600 }}>Description</label>
                       <input className="input" value={String(editData.description || '')} onChange={e => setEditData(d => ({ ...d, description: e.target.value }))} style={{ marginBottom: 0 }} /></div>
+
+                    {/* Récurrence */}
+                    <div>
+                      <label style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600, display: 'block', marginBottom: 6 }}>🔄 Récurrence</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                        {[
+                          { val: 'none', label: 'Aucune' },
+                          { val: 'weekly', label: 'Chaque semaine' },
+                          { val: 'monthly', label: 'Chaque mois' },
+                          { val: 'yearly', label: 'Chaque année' },
+                        ].map(opt => {
+                          const sel = (editData.recurrence || 'none') === opt.val;
+                          return <button key={opt.val} type="button"
+                            onClick={() => setEditData(d => ({ ...d, recurrence: opt.val, recurrence_count: opt.val === 'none' ? undefined : (d.recurrence_count || 4) }))}
+                            style={{ padding: '5px 12px', borderRadius: 16, border: `2px solid ${sel ? '#6366F1' : 'var(--border)'}`, background: sel ? '#EEF2FF' : 'var(--surface)', color: sel ? '#4338CA' : 'var(--text-2)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                            {opt.label}
+                          </button>;
+                        })}
+                      </div>
+                      {editData.recurrence && editData.recurrence !== 'none' && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <label style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                            Nombre de fois :
+                          </label>
+                          <input className="input" type="number" min={1} max={52}
+                            value={String(editData.recurrence_count || 4)}
+                            onChange={e => setEditData(d => ({ ...d, recurrence_count: parseInt(e.target.value) || 1 }))}
+                            style={{ marginBottom: 0, width: 70 }} />
+                          <span style={{ fontSize: 12, color: 'var(--text-2)' }}>
+                            {editData.recurrence === 'weekly' ? 'semaines' : editData.recurrence === 'monthly' ? 'mois' : 'ans'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
                     <div>
                       <label style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600, display: 'block', marginBottom: 6 }}>Membres</label>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>

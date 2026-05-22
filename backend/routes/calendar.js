@@ -45,11 +45,13 @@ router.get('/', authMiddleware, async (req, res) => {
 
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { title, date, time, end_time, member_id, member_ids, description, urgent, recurrence } = req.body;
+    const { title, date, time, end_time, member_id, member_ids, description, urgent, recurrence, recurrence_count } = req.body;
     if (!title || !date) return res.status(400).json({ error: 'Titre et date requis' });
     const memberIdsJson = member_ids && member_ids.length > 0 ? JSON.stringify(member_ids) : '';
     const isUrgent = urgent ? 1 : 0;
     const rec = recurrence || 'none';
+    // Nombre d'occurrences personnalisé (défaut : 12 pour weekly, 6 pour monthly)
+    const count = recurrence_count ? Math.min(Math.max(1, parseInt(recurrence_count)), 52) : null;
 
     const result = await db.execute(
       'INSERT INTO events (family_id, member_id, title, date, time, end_time, description, member_ids, urgent, recurrence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -59,8 +61,9 @@ router.post('/', authMiddleware, async (req, res) => {
 
     // Créer les occurrences récurrentes
     if (rec === 'weekly') {
+      const total = count || 12;
       const baseDate = new Date(date + 'T00:00:00');
-      for (let i = 1; i <= 12; i++) {
+      for (let i = 1; i <= total; i++) {
         const d = new Date(baseDate);
         d.setDate(baseDate.getDate() + i * 7);
         const ds = d.toISOString().split('T')[0];
@@ -70,14 +73,27 @@ router.post('/', authMiddleware, async (req, res) => {
         ).catch(() => {});
       }
     } else if (rec === 'monthly') {
+      const total = count || 6;
       const baseDate = new Date(date + 'T00:00:00');
-      for (let i = 1; i <= 6; i++) {
+      for (let i = 1; i <= total; i++) {
         const d = new Date(baseDate);
         d.setMonth(baseDate.getMonth() + i);
         const ds = d.toISOString().split('T')[0];
         await db.execute(
           'INSERT INTO events (family_id, member_id, title, date, time, end_time, description, member_ids, urgent, recurrence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [req.user.familyId, member_id || null, title, ds, time || '', end_time || '', description || '', memberIdsJson, 0, 'monthly']
+        ).catch(() => {});
+      }
+    } else if (rec === 'yearly') {
+      const total = count || 3;
+      const baseDate = new Date(date + 'T00:00:00');
+      for (let i = 1; i <= total; i++) {
+        const d = new Date(baseDate);
+        d.setFullYear(baseDate.getFullYear() + i);
+        const ds = d.toISOString().split('T')[0];
+        await db.execute(
+          'INSERT INTO events (family_id, member_id, title, date, time, end_time, description, member_ids, urgent, recurrence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [req.user.familyId, member_id || null, title, ds, time || '', end_time || '', description || '', memberIdsJson, 0, 'yearly']
         ).catch(() => {});
       }
     }
