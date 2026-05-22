@@ -85,9 +85,9 @@ Règles:
       const geminiKey = (process.env.GEMINI_API_KEY_ASSISTANT || process.env.GEMINI_API_KEY || '').trim();
       if (geminiKey) {
         const GEMINI_MODELS = [
-          { model: 'gemini-2.0-flash',      version: 'v1beta' },
-          { model: 'gemini-2.0-flash-lite',  version: 'v1beta' },
-          { model: 'gemini-1.5-flash',       version: 'v1beta' },
+          { model: 'gemini-2.5-flash-preview-05-20', version: 'v1beta' },
+          { model: 'gemini-2.0-flash',               version: 'v1beta' },
+          { model: 'gemini-2.0-flash-lite',          version: 'v1beta' },
         ];
         for (const { model, version } of GEMINI_MODELS) {
           try {

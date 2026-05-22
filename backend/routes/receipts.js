@@ -48,11 +48,9 @@ async function analyzeWithMistral(base64Data, mimetype) {
 
 // ── Gemini (fallback) ────────────────────────────────────────────────────────
 const GEMINI_MODELS = [
-  { model: 'gemini-1.5-flash-8b', version: 'v1beta' },
-  { model: 'gemini-1.5-flash-8b', version: 'v1' },
-  { model: 'gemini-1.5-flash',    version: 'v1' },
-  { model: 'gemini-2.0-flash-lite', version: 'v1beta' },
-  { model: 'gemini-2.0-flash',    version: 'v1beta' },
+  { model: 'gemini-2.5-flash-preview-05-20', version: 'v1beta' },
+  { model: 'gemini-2.0-flash',               version: 'v1beta' },
+  { model: 'gemini-2.0-flash-lite',          version: 'v1beta' },
 ];
 
 async function callGemini(apiKey, model, version, parts) {
