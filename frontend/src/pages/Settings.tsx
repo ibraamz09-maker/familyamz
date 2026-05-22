@@ -63,19 +63,14 @@ export default function Settings() {
     setGeminiTestResult(null);
     try {
       const res = await api.testGemini();
-      const working = res.results.find((r: any) => r.ok);
-      const geminiWorking = res.results.find((r: any) => r.ok && r.model.startsWith('Gemini'));
-      const mistralWorking = res.results.find((r: any) => r.ok && r.model.startsWith('Mistral'));
-      if (working) {
-        const lines = [];
-        if (geminiWorking) lines.push(`✅ Gemini OK (${geminiWorking.model}) — clé : ${res.keyPrefix}`);
-        else lines.push(`❌ Gemini KO — clé : ${res.keyPrefix}\n${res.results.filter((r: any) => r.model.startsWith('Gemini')).map((r: any) => `  ${r.model}: ${r.error}`).join('\n')}`);
-        if (mistralWorking) lines.push(`✅ Mistral OK (${mistralWorking.model})`);
-        setGeminiTestResult(lines.join('\n'));
-      } else {
-        const errors = res.results.map((r: any) => `${r.model}: ${r.error}`).join('\n');
-        setGeminiTestResult(`❌ Tous les modèles échouent :\n${errors}`);
-      }
+      const groqOk = res.results.find((r: any) => r.ok && r.model.startsWith('Groq'));
+      const mistralOk = res.results.find((r: any) => r.ok && r.model.startsWith('Mistral'));
+      const lines = [];
+      if (groqOk) lines.push(`✅ Groq OK — assistant vocal actif`);
+      else lines.push(`❌ Groq KO — vérifie la clé GROQ_API_KEY sur Render`);
+      if (mistralOk) lines.push(`✅ Mistral OK — analyse tickets active`);
+      else lines.push(`❌ Mistral KO — vérifie la clé MISTRAL_API_KEY sur Render`);
+      setGeminiTestResult(lines.join('\n'));
     } catch (e) {
       setGeminiTestResult(`❌ Erreur : ${e instanceof Error ? e.message : 'Inconnue'}`);
     } finally {
@@ -246,18 +241,18 @@ export default function Settings() {
         )}
       </div>
 
-      {/* Diagnostic Gemini */}
-      <p className="section-title">Diagnostic IA (Gemini)</p>
+      {/* Diagnostic IA */}
+      <p className="section-title">Diagnostic IA</p>
       <div className="card" style={{ marginBottom: 20 }}>
         <button
           onClick={testGemini}
           disabled={geminiTesting}
           style={{ width: '100%', padding: '12px', borderRadius: 'var(--radius)', background: 'var(--primary)', color: 'white', border: 'none', fontWeight: 700, fontSize: 15, cursor: 'pointer', marginBottom: geminiTestResult ? 12 : 0 }}
         >
-          {geminiTesting ? '⏳ Test en cours...' : '🔍 Tester la connexion Gemini'}
+          {geminiTesting ? '⏳ Test en cours...' : '🔍 Tester les connexions IA'}
         </button>
         {geminiTestResult && (
-          <div style={{ fontSize: 13, padding: '10px 12px', borderRadius: 8, background: geminiTestResult.startsWith('✅') ? '#D1FAE5' : '#FEE2E2', color: geminiTestResult.startsWith('✅') ? '#065F46' : 'var(--danger)', whiteSpace: 'pre-line', fontWeight: 600 }}>
+          <div style={{ fontSize: 13, padding: '10px 12px', borderRadius: 8, background: geminiTestResult.includes('✅') ? '#D1FAE5' : '#FEE2E2', color: geminiTestResult.includes('✅') ? '#065F46' : 'var(--danger)', whiteSpace: 'pre-line', fontWeight: 600 }}>
             {geminiTestResult}
           </div>
         )}
