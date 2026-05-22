@@ -139,6 +139,7 @@ async function init() {
   try { await db.execute("ALTER TABLE members ADD COLUMN location_token TEXT DEFAULT ''"); } catch (e) {}
   try { await db.execute("ALTER TABLE tasks ADD COLUMN recurrence TEXT DEFAULT 'none'"); } catch (e) {}
   try { await db.execute("ALTER TABLE tasks ADD COLUMN done_date TEXT DEFAULT ''"); } catch (e) {}
+  try { await db.execute("ALTER TABLE tasks ADD COLUMN done_by TEXT DEFAULT ''"); } catch (e) {}
   try { await db.execute("ALTER TABLE events ADD COLUMN end_time TEXT DEFAULT ''"); } catch (e) {}
   try { await db.execute("ALTER TABLE expenses ADD COLUMN account TEXT DEFAULT 'Non placé'"); } catch (e) {}
   try { await db.execute("ALTER TABLE receipts ADD COLUMN account TEXT DEFAULT ''"); } catch (e) {}

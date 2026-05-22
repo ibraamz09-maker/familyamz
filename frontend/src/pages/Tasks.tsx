@@ -155,6 +155,11 @@ export default function Tasks() {
                     <span className="task-title">{task.title}</span>
                     <div style={{ fontSize: 11, color: '#6366F1', marginTop: 2 }}>
                       🔄 Se réinitialise à minuit
+                      {task.done === 1 && (task as any).done_by && (
+                        <span style={{ marginLeft: 6, color: '#16A34A', fontWeight: 700 }}>
+                          · ✓ {(task as any).done_by}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <button className="btn-icon" onClick={() => handleDelete(task.id)}>🗑️</button>
@@ -190,7 +195,14 @@ export default function Tasks() {
                 >
                   {task.done === 1 ? '✓' : ''}
                 </button>
-                <span className="task-title">{task.title}</span>
+                <div style={{ flex: 1 }}>
+                  <span className="task-title">{task.title}</span>
+                  {task.done === 1 && (task as any).done_by && (
+                    <div style={{ fontSize: 11, color: '#16A34A', fontWeight: 700, marginTop: 2 }}>
+                      ✓ {(task as any).done_by}
+                    </div>
+                  )}
+                </div>
                 <button className="btn-icon" onClick={() => handleDelete(task.id)}>🗑️</button>
               </div>
             ))

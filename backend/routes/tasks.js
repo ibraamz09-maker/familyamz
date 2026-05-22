@@ -46,6 +46,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
   try {
     const { title, done } = req.body;
     const today = todayStr();
+    const memberName = req.user.memberName || req.user.name || '';
 
     // Récupérer la tâche pour connaître sa récurrence
     const existing = await db.execute(
@@ -55,19 +56,18 @@ router.put('/:id', authMiddleware, async (req, res) => {
     if (existing.rows.length === 0) return res.status(404).json({ error: 'Tâche introuvable' });
 
     const rec = existing.rows[0].recurrence;
+    const doneBy = done ? memberName : '';
 
     if (rec === 'daily') {
-      // Tâche quotidienne : on met à jour done_date (aujourd'hui si done, '' si décoché)
       const newDoneDate = done ? today : '';
       await db.execute(
-        'UPDATE tasks SET title = ?, done_date = ? WHERE id = ? AND family_id = ?',
-        [title, newDoneDate, req.params.id, req.user.familyId]
+        'UPDATE tasks SET title = ?, done_date = ?, done_by = ? WHERE id = ? AND family_id = ?',
+        [title, newDoneDate, doneBy, req.params.id, req.user.familyId]
       );
     } else {
-      // Tâche normale
       await db.execute(
-        'UPDATE tasks SET title = ?, done = ? WHERE id = ? AND family_id = ?',
-        [title, done ? 1 : 0, req.params.id, req.user.familyId]
+        'UPDATE tasks SET title = ?, done = ?, done_by = ? WHERE id = ? AND family_id = ?',
+        [title, done ? 1 : 0, doneBy, req.params.id, req.user.familyId]
       );
     }
 
