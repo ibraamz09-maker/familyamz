@@ -125,24 +125,27 @@ router.get('/test-gemini', authMiddleware, async (req, res) => {
     results.push({ model: 'Mistral', ok: false, error: 'MISTRAL_API_KEY non défini' });
   }
 
-  // Test Gemini
+  // Test Gemini — teste tous les modèles et affiche le résultat de chacun
   if (geminiKey) {
     for (const { model, version } of GEMINI_MODELS) {
       try {
         const data = await callGemini(geminiKey, model, version, [{ text: 'Réponds juste ok' }]);
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
         results.push({ model: `Gemini ${model}`, ok: true, response: text.slice(0, 50) });
-        break;
+        break; // un seul succès suffit
       } catch (e) {
         results.push({ model: `Gemini ${model}`, ok: false, error: e.message });
         if (e.message.includes('401') || e.message.includes('403')) break;
       }
     }
   } else {
-    results.push({ model: 'Gemini', ok: false, error: 'GEMINI_API_KEY non défini' });
+    results.push({ model: 'Gemini', ok: false, error: 'GEMINI_API_KEY non défini sur le serveur' });
   }
 
-  res.json({ results });
+  res.json({
+    keyPrefix: geminiKey ? geminiKey.slice(0, 8) + '...' : 'non définie',
+    results,
+  });
 });
 
 router.post('/analyze', authMiddleware, async (req, res) => {

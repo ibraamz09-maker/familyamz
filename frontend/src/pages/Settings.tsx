@@ -63,12 +63,18 @@ export default function Settings() {
     setGeminiTestResult(null);
     try {
       const res = await api.testGemini();
-      const working = res.results.find(r => r.ok);
+      const working = res.results.find((r: any) => r.ok);
+      const geminiWorking = res.results.find((r: any) => r.ok && r.model.startsWith('Gemini'));
+      const mistralWorking = res.results.find((r: any) => r.ok && r.model.startsWith('Mistral'));
       if (working) {
-        setGeminiTestResult(`✅ Gemini fonctionne ! Modèle : ${working.model} (clé : ${res.keyPrefix})`);
+        const lines = [];
+        if (geminiWorking) lines.push(`✅ Gemini OK (${geminiWorking.model}) — clé : ${res.keyPrefix}`);
+        else lines.push(`❌ Gemini KO — clé : ${res.keyPrefix}\n${res.results.filter((r: any) => r.model.startsWith('Gemini')).map((r: any) => `  ${r.model}: ${r.error}`).join('\n')}`);
+        if (mistralWorking) lines.push(`✅ Mistral OK (${mistralWorking.model})`);
+        setGeminiTestResult(lines.join('\n'));
       } else {
-        const errors = res.results.map(r => `${r.model}: ${r.error}`).join('\n');
-        setGeminiTestResult(`❌ Gemini échoue :\n${errors}`);
+        const errors = res.results.map((r: any) => `${r.model}: ${r.error}`).join('\n');
+        setGeminiTestResult(`❌ Tous les modèles échouent :\n${errors}`);
       }
     } catch (e) {
       setGeminiTestResult(`❌ Erreur : ${e instanceof Error ? e.message : 'Inconnue'}`);
