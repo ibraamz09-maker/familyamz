@@ -142,6 +142,25 @@ router.get('/test-gemini', authMiddleware, async (req, res) => {
     results.push({ model: 'Gemini', ok: false, error: 'GEMINI_API_KEY non défini sur le serveur' });
   }
 
+  // Test Groq
+  const groqKey = (process.env.GROQ_API_KEY || '').trim();
+  if (groqKey) {
+    try {
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${groqKey}` },
+        body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: [{ role: 'user', content: 'Réponds juste ok' }], max_tokens: 10 }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d?.error?.message || `HTTP ${r.status}`);
+      results.push({ model: 'Groq llama-3.1-8b', ok: true, response: d.choices?.[0]?.message?.content || '' });
+    } catch (e) {
+      results.push({ model: 'Groq llama-3.1-8b', ok: false, error: e.message });
+    }
+  } else {
+    results.push({ model: 'Groq', ok: false, error: 'GROQ_API_KEY non défini' });
+  }
+
   res.json({
     keyPrefix: geminiKey ? geminiKey.slice(0, 8) + '...' : 'non définie',
     results,
