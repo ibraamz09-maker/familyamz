@@ -247,7 +247,7 @@ export default function AssistantModal({ onClose, members, onDone }: Props) {
                           </button>;
                         })}
                       </div>
-                      {editData.recurrence && editData.recurrence !== 'none' && (
+                      {(editData.recurrence as string) && (editData.recurrence as string) !== 'none' && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                           <label style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600, whiteSpace: 'nowrap' }}>
                             Nombre de fois :
