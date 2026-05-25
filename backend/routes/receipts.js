@@ -297,7 +297,9 @@ router.delete('/:id', authMiddleware, async (req, res) => {
       sql: 'SELECT expense_id FROM receipts WHERE id = ? AND family_id = ?',
       args: [req.params.id, req.user.familyId]
     });
-    if (rec.rows.length > 0 && rec.rows[0].expense_id) {
+    // On NE supprime PAS la dépense associée — elle reste dans les comptes
+    // Anciennement : supprimait aussi la dépense (bug signalé)
+    if (false && rec.rows.length > 0 && rec.rows[0].expense_id) {
       await db.execute({
         sql: 'DELETE FROM expenses WHERE id = ? AND family_id = ?',
         args: [rec.rows[0].expense_id, req.user.familyId]
