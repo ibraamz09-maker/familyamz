@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import { api } from './api';
 import Login from './pages/Login';
@@ -51,9 +51,29 @@ const TAB_TITLES: Record<Tab, string> = {
 };
 
 
+const DESKTOP_TABS: { id: Tab; icon: string; label: string }[] = [
+  { id: 'calendar',  icon: '📅', label: 'Agenda' },
+  { id: 'tasks',     icon: '✅', label: 'Tâches' },
+  { id: 'expenses',  icon: '💶', label: 'Dépenses' },
+  { id: 'messages',  icon: '💬', label: 'Messages' },
+  { id: 'map',       icon: '🗺️', label: 'Carte' },
+  { id: 'settings',  icon: '⚙️', label: 'Réglages' },
+];
+
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 768);
+  useEffect(() => {
+    const handler = () => setIsDesktop(window.innerWidth >= 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isDesktop;
+}
+
 export default function App() {
-  const { family, isAdmin, member } = useAuth();
+  const { family, isAdmin, member, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('calendar');
+  const isDesktop = useIsDesktop();
 
   // Appliquer le thème et la taille de police sauvegardés
   useEffect(() => {
@@ -101,6 +121,65 @@ export default function App() {
   if (!family && !isAdmin) return <Login />;
   if (isAdmin) return <Admin />;
 
+  // ── Layout DESKTOP ──
+  if (isDesktop) {
+    return (
+      <div className="app">
+        {/* Sidebar */}
+        <aside className="desktop-sidebar">
+          <div className="desktop-sidebar-logo">
+            <h1>🏠 FamilyAmz</h1>
+            <p>Famille {family?.name}</p>
+          </div>
+          <nav className="desktop-sidebar-nav">
+            {DESKTOP_TABS.map(t => (
+              <button
+                key={t.id}
+                className={`desktop-nav-item ${activeTab === t.id ? 'active' : ''}`}
+                onClick={() => setActiveTab(t.id)}
+              >
+                <span className="desktop-nav-icon">{t.icon}</span>
+                {t.label}
+              </button>
+            ))}
+          </nav>
+          <div className="desktop-sidebar-footer">
+            {member && (
+              <div className="desktop-sidebar-member">
+                <div className="desktop-sidebar-avatar" style={{ backgroundColor: member.color }}>
+                  {member.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <div className="desktop-sidebar-name">{member.name}</div>
+                  <div className="desktop-sidebar-family">Famille {family?.name}</div>
+                </div>
+              </div>
+            )}
+            <button className="desktop-logout-btn" onClick={logout}>🚪 Déconnexion</button>
+          </div>
+        </aside>
+
+        {/* Zone principale */}
+        <div className="desktop-main">
+          <div className="desktop-topbar">
+            <h1>{TAB_TITLES[activeTab]}</h1>
+            {activeTab === 'calendar' && <CalendarAssistantBtn />}
+          </div>
+          <main className="main-content">
+            {activeTab === 'calendar' && <Calendar />}
+            {activeTab === 'tasks' && <Tasks />}
+            {activeTab === 'expenses' && <Expenses />}
+            {activeTab === 'messages' && <Messages />}
+            {activeTab === 'map' && <MapPage />}
+            {activeTab === 'members' && <Members />}
+            {activeTab === 'settings' && <Settings />}
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Layout MOBILE ──
   return (
     <div className="app">
       <Header />
